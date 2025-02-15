@@ -1,0 +1,5 @@
+pip install "instructor[google-generativeai, vertexai]"
+pip install openai
+pip install fastapi
+pip install pydantic_settings
+pip istall sqlalchemy
