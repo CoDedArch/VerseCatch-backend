@@ -3,9 +3,9 @@ import asyncio
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, status, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.core.database import aget_db
-from src.core.security import verify_api_key
-from src.apps.requotes.services import QuoteDetectionService
+from core.database import aget_db
+from core.security import verify_api_key
+from apps.requotes.services import QuoteDetectionService
 
 
 router = APIRouter()

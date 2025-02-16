@@ -19,7 +19,7 @@ class Settings(BaseSettings):
     """Class to store all the settings of the application."""
 
     APOSTGRES_DATABASE_URL: str = os.getenv("APOSTGRES_DATABASE_URL")
-    API_KEY: str = os.getenv("API_KEY")
+    API_KEY: str = "postgresql+asyncpg://postgres:#Includeiostream98@localhost:5432/ai_bible_db"
     OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY")
 
 

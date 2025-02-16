@@ -5,7 +5,7 @@ from openai import AsyncOpenAI
 from pydantic import BaseModel
 import wave
 
-from src.core.config import settings
+from core.config import settings
 
 client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
 

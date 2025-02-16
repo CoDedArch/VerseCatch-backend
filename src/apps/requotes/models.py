@@ -5,7 +5,7 @@ from sqlalchemy import ForeignKey, String, Integer, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from src.core.database import Base
+from core.database import Base
 
 
 class Version(Base):

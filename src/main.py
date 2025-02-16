@@ -1,8 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from src.core.database import session_manager
-from src.apps.requotes.models import Base
-from src.apps.requotes.router import router as bible_quotes_router
+from core.database import session_manager
+from apps.requotes.models import Base
+from apps.requotes.router import router as bible_quotes_router
 
 
 app = FastAPI(

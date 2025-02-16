@@ -17,7 +17,7 @@ from sqlalchemy.ext.asyncio import (
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
-from src.core.config import settings
+from core.config import settings
 
 load_dotenv()
 
@@ -125,7 +125,7 @@ class DatabaseSessionManager:
         await self.engine.dispose()
 
 
-session_manager = DatabaseSessionManager(database_url=settings.APOSTGRES_DATABASE_URL)
+session_manager = DatabaseSessionManager(database_url="postgresql+asyncpg://postgres:#Includeiostream98@localhost:5432/ai_bible_db")
 
 
 async def aget_db() -> AsyncGenerator[AsyncSession, None]:
