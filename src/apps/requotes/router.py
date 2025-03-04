@@ -10,7 +10,7 @@ from apps.requotes.services import QuoteDetectionService
 
 router = APIRouter()
 
-async def process_audio_queue(websocket: WebSocket, session: AsyncSession, queue: asyncio.Queue):
+async def process_audio_queue(websocket: WebSocket, session: AsyncSession, queue: asyncio.Queue, version):
     """
     Background task to process audio chunks from a queue, detect quotes in the audio,
     and send the detected quotes via a WebSocket.
@@ -47,7 +47,7 @@ async def process_audio_queue(websocket: WebSocket, session: AsyncSession, queue
         if audio_chunk is None:
             break
 
-        detector = QuoteDetectionService(session, audio_chunk, version="ASV_bible")
+        detector = QuoteDetectionService(session, audio_chunk, version=version)
         await detector.scan_for_quotes()
         if detector.quote_detected:
             await websocket.send_json([q.model_dump() for q in detector.quotes])
@@ -94,6 +94,9 @@ async def websocket_endpoint(
 
     """
     api_key = websocket.query_params.get("api_key")
+    version = websocket.query_params.get("version")
+    
+
     if not verify_api_key(api_key):
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
         return
@@ -101,7 +104,7 @@ async def websocket_endpoint(
     await websocket.accept()
 
     audio_queue = asyncio.Queue()
-    processing_task = asyncio.create_task(process_audio_queue(websocket, session, audio_queue))
+    processing_task = asyncio.create_task(process_audio_queue(websocket, session, audio_queue, version))
 
     try:
         while True:
