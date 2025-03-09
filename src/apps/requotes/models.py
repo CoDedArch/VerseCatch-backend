@@ -1,10 +1,10 @@
 from typing import List
 from uuid import UUID as PyUUID
 
-from sqlalchemy import ForeignKey, String, Integer, text
+from sqlalchemy import ForeignKey, String, Integer, text, Column, Boolean, DateTime
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-
+from sqlalchemy.sql import func
 from core.database import Base
 
 
@@ -42,3 +42,22 @@ class Verse(Base):
     text: Mapped[str] = mapped_column(String)
 
     version: Mapped["Version"] = relationship("Version", back_populates="verses")
+
+
+class User(Base):
+    """
+    SQLAlchemy model for storing user information.
+    """
+
+    __tablename__ = "users"
+
+    id: Mapped[PyUUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, server_default=text("uuid_generate_v4()")
+    )
+    first_name: Mapped[str] = mapped_column(String, nullable=False)
+    last_name: Mapped[str] = mapped_column(String, nullable=False)
+    email: Mapped[str] = mapped_column(String, unique=True, index=True, nullable=False)
+    password: Mapped[str] = mapped_column(String, nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    verified = Column(Boolean, default=False)  # New field
+    created_at = Column(DateTime, server_default=func.now())  # Add created_at field
