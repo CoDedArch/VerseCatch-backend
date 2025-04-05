@@ -7,7 +7,6 @@ class Quote(BaseModel):
     """
     Pydantic model for a Bible quote.
     """
-
     version: str = Field(..., title="Bible version")
     book: str = Field(..., title="Book of the Bible")
     chapter: int = Field(..., title="Chapter number")
@@ -33,6 +32,7 @@ class UserCreate(UserBase):
     first_name: str = Field(..., title="First name", min_length=1, max_length=50)
     last_name: str = Field(..., title="Last name", min_length=1, max_length=50)
     password: SecretStr = Field(..., title="Password", min_length=8)
+    bible_version: str = Field(..., title="Preferred Bible version")  # Add this field
 
 
 class UserLogin(UserBase):
@@ -42,7 +42,6 @@ class UserLogin(UserBase):
     password: SecretStr = Field(..., title="Password")
 
 
-
 class UserResponse(UserBase):
     """
     Schema for returning user information.
@@ -50,10 +49,15 @@ class UserResponse(UserBase):
     id: UUID
     first_name: str = Field(..., title="First name")
     last_name: str = Field(..., title="Last name")
-    email: str = Field(..., title="user email")
+    email: str = Field(..., title="User email")
     is_active: bool = Field(..., title="Is user active")
     verified: bool
+    streak: int
+    faith_coins: int
+    current_tag: str
+    bible_version: str = Field(..., title="Preferred Bible version")  # Add this field
     created_at: datetime = Field(..., title="User creation timestamp")
+    has_taken_tour: bool = Field(..., title="Has the user taken the site tour") 
 
     class Config:
         from_attributes = True
@@ -73,10 +77,15 @@ class TokenData(BaseModel):
     """
     email: Optional[str] = Field(None, title="User email")
 
+
 # Request model for checking email
 class EmailCheckRequest(BaseModel):
     email: str
 
+
 # Response model for checking email
 class EmailCheckResponse(BaseModel):
     exists: bool
+
+class SignupResponse(BaseModel):
+    message: str
