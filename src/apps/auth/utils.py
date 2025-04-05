@@ -38,7 +38,7 @@ def create_verification_token(data: dict):
 
 
 async def send_verification_email(email: str, token: str):
-    verification_url = f"https://d894-129-224-201-149.ngrok-free.app/auth/verify?token={token}"
+    verification_url = f"https://48c1-129-224-201-51.ngrok-free.app/auth/verify?token={token}"
     
     # Create a multipart message
     msg = MIMEMultipart()
