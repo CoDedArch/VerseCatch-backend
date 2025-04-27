@@ -103,8 +103,7 @@ class User(Base):
     id: Mapped[PyUUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, server_default=text("uuid_generate_v4()")
     )
-    first_name: Mapped[str] = mapped_column(String, nullable=False)
-    last_name: Mapped[str] = mapped_column(String, nullable=False)
+    user_name: Mapped[str] = mapped_column(String, nullable=False)
     email: Mapped[str] = mapped_column(String, unique=True, index=True, nullable=False)
     password: Mapped[str] = mapped_column(String, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
@@ -145,8 +144,7 @@ class UnverifiedUser(Base):
     __tablename__ = "unverified_users"
 
     id = Column(String, primary_key=True, default=lambda: str(uuid4()))
-    first_name = Column(String)
-    last_name = Column(String)
+    user_name = Column(String)
     email = Column(String, unique=True, index=True)
     password = Column(String)
     bible_version = Column(String)

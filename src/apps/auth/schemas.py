@@ -29,8 +29,7 @@ class UserCreate(UserBase):
     """
     Schema for creating a new user.
     """
-    first_name: str = Field(..., title="First name", min_length=1, max_length=50)
-    last_name: str = Field(..., title="Last name", min_length=1, max_length=50)
+    user_name: str = Field(..., title="First name", min_length=1, max_length=50)
     password: SecretStr = Field(..., title="Password", min_length=8)
     bible_version: str = Field(..., title="Preferred Bible version")  # Add this field
 
@@ -89,3 +88,8 @@ class EmailCheckResponse(BaseModel):
 
 class SignupResponse(BaseModel):
     message: str
+
+
+class LoginRequest(BaseModel):
+    identifier: str = Field(..., title="Identifier (email or username)")
+    password: SecretStr

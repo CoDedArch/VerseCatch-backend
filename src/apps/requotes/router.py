@@ -86,30 +86,6 @@ async def track_verse_catch(session, user, book_name):
         raise
 
 
-async def track_daily_login(session, user):
-    """Check and reward daily login streaks."""
-    # Increment or reset streak
-    last_activity = await session.scalar(
-        select(UserActivity).where(
-            UserActivity.user_id == user.id, UserActivity.activity_type == "daily_login"
-        ).order_by(UserActivity.activity_date.desc()).limit(1)
-    )
-
-    if last_activity and last_activity.activity_date.date() == (datetime.utcnow() - timedelta(days=1)).date():
-        user.streak += 1
-    else:
-        user.streak = 1
-
-    # Award "Daily Devotee" after 7 days
-    if user.streak >= 7:
-        await award_achievement(session, user, "Daily Devotee", "Daily Devotee", 7)
-
-    # Log the daily login activity
-    new_activity = UserActivity(user_id=user.id, activity_type="daily_login")
-    session.add(new_activity)
-
-    await session.commit()
-
 
 async def track_sharing(session, user):
     """Track shared verses and award 'Sharing Saint' tag."""
@@ -123,6 +99,22 @@ async def track_sharing(session, user):
     await session.commit()
 
 
+@router.post("/api/track-verse-catch/")
+async def executeTrackVerseCatch(data: dict, session: AsyncSession = Depends(aget_db)):
+    try:
+        print(f"Received data: {data}")
+        user = await session.scalar(select(User).where(User.email == data.email))
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        await track_verse_catch(session, user, data.book_name)
+    except HTTPException as he:
+        print(f"HTTPException in track_verse_catch: {he.detail}")
+        raise he
+    except Exception as e:
+        print(f"Error in track_verse_catch: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+    
 
 async def process_audio_queue(websocket: WebSocket, session: AsyncSession, queue: asyncio.Queue, version):
     """
@@ -165,20 +157,7 @@ async def process_audio_queue(websocket: WebSocket, session: AsyncSession, queue
             detector = QuoteDetectionService(session, audio_chunk, version=version)
             await detector.scan_for_quotes()
             if detector.quote_detected:
-                print("in1")
                 await websocket.send_json([q.model_dump() for q in detector.quotes])
-                print("in2")
-
-                print(websocket.user_email)
-                # Fetch the user
-                user = await session.execute(select(User).where(User.email == websocket.user_email))
-                user = user.scalar_one_or_none()
-                if user:
-                    print("will update User data")
-                    # Track verse catch and update achievements
-                    for quote in detector.quotes:
-                        await track_verse_catch(session, user, quote.book)
-                print("in4")
         except Exception as e:
             print(f"Error processing audio chunk: {e}")
         finally:
@@ -259,13 +238,13 @@ async def websocket_endpoint(
 
 
 # Set up logging
-logging.basicConfig(level=logging.DEBUG)
-logger = logging.getLogger(__name__)
+# logging.basicConfig(level=logging.DEBUG)
+# logger = logging.getLogger(__name__)
 
 @router.get("/api/get-book/{book_name}")
 async def get_book(book_name: str, version_name: str, session: AsyncSession = Depends(aget_db)):
     try:
-        logger.debug(f"Fetching book: {book_name}, version: {version_name}")
+        # logger.debug(f"Fetching book: {book_name}, version: {version_name}")
 
         # Join Verse and Version tables and filter by Version.name and Verse.book
         query = (
@@ -281,10 +260,10 @@ async def get_book(book_name: str, version_name: str, session: AsyncSession = De
         result = await session.execute(query)
         verses = result.scalars().all()
 
-        logger.debug(f"Found {len(verses)} verses for book: {book_name}, version: {version_name}")
+        # logger.debug(f"Found {len(verses)} verses for book: {book_name}, version: {version_name}")
 
         if not verses:
-            logger.warning(f"No verses found for book: {book_name}, version: {version_name}")
+            # logger.warning(f"No verses found for book: {book_name}, version: {version_name}")
             raise HTTPException(status_code=404, detail="Book or version not found")
 
         # Group verses by chapter
@@ -300,12 +279,12 @@ async def get_book(book_name: str, version_name: str, session: AsyncSession = De
         # Convert to list of chapters
         book_data = [{"chapter": chapter, "verses": verses} for chapter, verses in chapters.items()]
 
-        logger.debug(f"Returning book data for {book_name}: {len(book_data)} chapters")
+        # logger.debug(f"Returning book data for {book_name}: {len(book_data)} chapters")
         return book_data
 
     except HTTPException as he:
-        logger.error(f"HTTPException in get_book: {he.detail}")
+        # logger.error(f"HTTPException in get_book: {he.detail}")
         raise he
     except Exception as e:
-        logger.error(f"Unexpected error in get_book: {str(e)}", exc_info=True)
+        # logger.error(f"Unexpected error in get_book: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail="Internal server error")

@@ -7,7 +7,7 @@ from jose import JWTError, jwt
 from datetime import datetime, timedelta
 from core.database import aget_db
 from apps.requotes.models import User, UserActivity,Achievement, UnverifiedUser, UserTheme, Theme
-from apps.auth.schemas import UserCreate, UserResponse, Token, UserLogin, EmailCheckRequest, EmailCheckResponse, SignupResponse
+from apps.auth.schemas import UserCreate, LoginRequest, Token, EmailCheckRequest, EmailCheckResponse, SignupResponse
 from apps.auth.utils import get_password_hash, verify_password, create_access_token, create_verification_token, send_verification_email, SECRET_KEY, ALGORITHM
 from sqlalchemy import select, func, distinct,delete
 from fastapi import WebSocket, WebSocketDisconnect
@@ -98,8 +98,7 @@ async def signup(user: UserCreate, db: AsyncSession = Depends(aget_db)):
     verification_token = create_verification_token({"sub": user.email})
 
     new_unverified_user = UnverifiedUser(
-        first_name=user.first_name,
-        last_name=user.last_name,
+        user_name=user.user_name,
         email=user.email,
         password=hashed_password,
         bible_version=user.bible_version,
@@ -136,8 +135,7 @@ async def verify_email(token: str, db: AsyncSession = Depends(aget_db)):
         raise credentials_exception
 
     new_user = User(
-        first_name=unverified_user.first_name,
-        last_name=unverified_user.last_name,
+        user_name=unverified_user.user_name,
         email=unverified_user.email,
         password=unverified_user.password,
         verified=True,  # Mark as verified
@@ -158,17 +156,20 @@ async def verify_email(token: str, db: AsyncSession = Depends(aget_db)):
 
 # login endpoint
 @router.post("/auth/login", response_model=Token)
-async def login(user: UserLogin, db: AsyncSession = Depends(aget_db)):
+async def login(user: LoginRequest, db: AsyncSession = Depends(aget_db)):
     """
-    Log in a user and return a JWT token.
+    Log in a user using either email or username and return a JWT token.
     """
-    # Find user by email
-    result = await db.execute(select(User).where(User.email == user.email))
+
+    # Find user by email or username
+    result = await db.execute(
+        select(User).where((User.email == user.identifier) | (User.user_name == user.identifier))
+    )
     db_user = result.scalar_one_or_none()
 
     # Check if user exists and verify password
     if not db_user or not verify_password(user.password.get_secret_value(), db_user.password):
-        raise HTTPException(status_code=400, detail="Incorrect email or password")
+        raise HTTPException(status_code=400, detail="Incorrect email/username or password")
 
     if not db_user.verified:
         raise HTTPException(status_code=400, detail="Email not verified")
@@ -210,6 +211,7 @@ async def login(user: UserLogin, db: AsyncSession = Depends(aget_db)):
         "access_token": access_token,
         "token_type": "bearer",
     }
+
 
 @router.post("/auth/check-email", response_model=EmailCheckResponse)
 async def check_email(request: EmailCheckRequest, db: AsyncSession = Depends(aget_db)):
@@ -311,8 +313,7 @@ async def websocket_user_details(websocket: WebSocket, db: AsyncSession = Depend
         # Send initial user details
         await websocket.send_json({
             "id": str(db_user.id),
-            "first_name": db_user.first_name,
-            "last_name": db_user.last_name,
+            "user_name": db_user.user_name,
             "email": db_user.email,
             "is_active": db_user.is_active,
             "verified": db_user.verified,
@@ -380,8 +381,7 @@ async def websocket_user_details(websocket: WebSocket, db: AsyncSession = Depend
 
                 await websocket.send_json({
                     "id": str(db_user.id),
-                    "first_name": db_user.first_name,
-                    "last_name": db_user.last_name,
+                    "user_name": db_user.user_name,
                     "email": db_user.email,
                     "is_active": db_user.is_active,
                     "verified": db_user.verified,

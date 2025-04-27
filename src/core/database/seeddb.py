@@ -24,7 +24,9 @@ THEMES = [
         "is_default": True,
         "styles": {
             "mainBackground": {
-                "background": "animated-gradient",
+                "background": "linear-gradient(135deg, #6dd5fa, #b0adf4, #bdb5c3, #f2f1d6)",
+                "backgroundSize": "400% 400%",
+                "animation": "gradientAnimation 10s ease infinite"
             },
             "taskBackground": {
                 "background": "linear-gradient(135deg, rgba(20, 30, 48, 1), rgba(36, 59, 85, 0.2))",
@@ -78,7 +80,9 @@ THEMES = [
         "is_default": False,
         "styles": {
             "mainBackground": {
-                "background": "linear-gradient(to bottom, #ffedd5, #fef3c7)"  # from-orange-100 to-yellow-50
+                "background": "linear-gradient(135deg, #ff9a9e, #fad0c4, #fef3c7, #ffedd5)",  # from-orange-100 to-yellow-50
+                 "backgroundSize": "400% 400%",
+                "animation": "sunrisePulse 12s ease infinite"
             },
             "taskBackground": {
                 "background": "linear-gradient(135deg, #ff9a9e, #fad0c4)",
@@ -100,12 +104,14 @@ THEMES = [
     {
         "name": "ocean-breeze",
         "display_name": "Ocean Breeze",
-        "price": 6,
+        "price": 75,
         "preview_image_url": "/assets/themes/ocean-breeze.jpg",
         "is_default": False,
         "styles": {
             "mainBackground": {
-                "background": "linear-gradient(to bottom right, #eff6ff, #cffafe)"  # from-blue-50 to-cyan-100
+                "background": "linear-gradient(135deg, #cffafe, #a5f3fc, #a8edea, #fed6e3)",  # from-blue-50 to-cyan-100
+                "backgroundSize": "400% 400%",
+                "animation": "oceanWave 15s linear infinite"
             },
             "taskBackground": {
                 "background": "linear-gradient(145deg, #a8edea, #fed6e3)",
@@ -159,7 +165,9 @@ THEMES = [
         "is_default": False,
         "styles": {
             "mainBackground": {
-                "background": "linear-gradient(to bottom right, #f5f3ff, #ede9fe)"  # from-purple-50 to-violet-100
+                "background": "linear-gradient(135deg, #c4b5fd, #a78bfa, #8b5cf6, #6d28d9)", # from-purple-50 to-violet-100
+                "backgroundSize": "400% 400%",
+                "animation": "royalGlow 8s ease-in-out infinite"
             },
             "taskBackground": {
                 "background": "linear-gradient(145deg, #c4b5fd, #a78bfa)",
@@ -181,12 +189,14 @@ THEMES = [
     {
         "name": "fiery-red",
         "display_name": "Fiery Red",
-        "price": 70,
+        "price": 75,
         "preview_image_url": "/assets/themes/fiery-red.jpg",
         "is_default": False,
         "styles": {
             "mainBackground": {
-                "background": "linear-gradient(to bottom right, #fef2f2, #ffe4e6)"  # from-red-50 to-rose-100
+                "background": "linear-gradient(135deg, #ff758c, #ff7eb3, #ff8e53, #ffb347)",
+                "backgroundSize": "400% 400%",
+                "animation": "fireFlicker 10s alternate infinite"
             },
             "taskBackground": {
                 "background": "linear-gradient(145deg, #ff758c, #ff7eb3)",
@@ -213,7 +223,9 @@ THEMES = [
         "is_default": False,
         "styles": {
             "mainBackground": {
-                "background": "linear-gradient(to bottom right, #fffbeb, #fef3c7)"  # from-amber-50 to-yellow-100
+                "background": "linear-gradient(135deg, #f6d365, #fda085, #ffb347, #fde68a)",
+                "backgroundSize": "400% 400%",
+                "animation": "goldenPulse 9s cubic-bezier(0.4, 0, 0.6, 1) infinite"
             },
             "taskBackground": {
                 "background": "linear-gradient(145deg, #f6d365, #fda085)",
@@ -240,7 +252,9 @@ THEMES = [
         "is_default": False,
         "styles": {
             "mainBackground": {
-                "background": "linear-gradient(to bottom right, #312e81, #581c87)"  # from-indigo-900 to-purple-900
+                "background": "linear-gradient(135deg, #4f46e5, #7c3aed, #9333ea, #6b21a8)",
+                "backgroundSize": "400% 400%",
+                "animation": "twilightShimmer 20s linear infinite"
             },
             "taskBackground": {
                 "background": "linear-gradient(145deg, #4f46e5, #7c3aed)",
@@ -262,12 +276,14 @@ THEMES = [
     {
         "name": "mint-fresh",
         "display_name": "Mint Fresh",
-        "price": 4,
+        "price": 75,
         "preview_image_url": "/assets/themes/mint-fresh.jpg",
         "is_default": False,
         "styles": {
             "mainBackground": {
-                "background": "linear-gradient(to bottom right, #f0fdf9, #ccfbf1)"  # from-teal-50 to-emerald-100
+               "background": "linear-gradient(135deg, #a1ffce, #faffd1, #ccfbf1, #a7f3d0)",
+                "backgroundSize": "400% 400%",
+                "animation": "mintSwirl 14s ease infinite"
             },
             "taskBackground": {
                 "background": "linear-gradient(145deg, #a1ffce, #faffd1)",

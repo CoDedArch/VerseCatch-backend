@@ -38,14 +38,15 @@ def create_verification_token(data: dict):
 
 
 async def send_verification_email(email: str, token: str):
-    verification_url = f"https://48c1-129-224-201-51.ngrok-free.app/auth/verify?token={token}"
+    verification_url = f"https://6c9b-129-224-201-49.ngrok-free.app/auth/verify?token={token}"
+    sender_mail = "kelvingbolo98@gmail.com"
     
     # Create a multipart message
     msg = MIMEMultipart()
-    msg["From"] = "VerseCatch Team <kelvingbolo98@gmail.com>"
+    msg["From"] = f"VerseCatch Team <{sender_mail}>"
     msg["To"] = email
     msg["Subject"] = "Verify Your Account for VerseCatch"
-    msg["Reply-To"] = "kelvingbolo98@gmail.com"
+    msg["Reply-To"] = sender_mail
 
     # Add HTML content
     html_content = f"""
@@ -74,9 +75,12 @@ async def send_verification_email(email: str, token: str):
 
     try:
         with smtplib.SMTP("smtp.gmail.com", 587) as server:
+            print("in")
             server.starttls()
-            server.login("kelvingbolo98@gmail.com", "rjrt rgur viec sska")
-            server.sendmail("kelvingbolo98@gmail.com", [email], msg.as_string())
+            print("in")
+            server.login(sender_mail, "gphc tfvg dwhc rkel")
+            server.sendmail(sender_mail, [email], msg.as_string())
+            print("out")
         print(f"Verification email sent to {email}")
     except smtplib.SMTPException as e:
         print(f"Failed to send email: {e}")
