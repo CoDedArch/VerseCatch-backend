@@ -125,7 +125,7 @@ class DatabaseSessionManager:
         await self.engine.dispose()
 
 
-session_manager = DatabaseSessionManager(database_url="postgresql+asyncpg://postgres:#Includeiostream98@localhost:5432/ai_bible_db")
+session_manager = DatabaseSessionManager(database_url=settings.APOSTGRES_DATABASE_URL)
 
 
 async def aget_db() -> AsyncGenerator[AsyncSession, None]:
