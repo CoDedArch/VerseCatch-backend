@@ -746,6 +746,7 @@ async def create_payment(
     db: AsyncSession = Depends(aget_db),
     token: str = Depends(oauth2_scheme)
 ):
+    print("Payment Request Recieved")
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         email = payload.get("sub")
@@ -768,6 +769,15 @@ async def create_payment(
     reference = f"VC-{datetime.now().strftime('%Y%m%d')}-{random.randint(1000, 9999)}"
 
     # Create payment record
+    # Fetch real exchange rate from an external API
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get("https://api.exchangerate-api.com/v4/latest/GHS")
+        exchange_data = response.json()
+        usd_rate = exchange_data["rates"].get("USD", 12)  # Default to 12 if USD rate is not found
+    except Exception as e:
+        usd_rate = 12  # Fallback to default rate in case of an error
+
     new_payment = Payment(
         user_id=user.id,
         amount=amount,
@@ -776,7 +786,7 @@ async def create_payment(
         status="pending",
         metadata={
             "donation_type": "supporter" if amount >= 5 else "standard",
-            "original_usd_amount": amount / 12  # Store approximate USD equivalent
+            "original_usd_amount": amount / usd_rate  
         }
     )
     db.add(new_payment)
