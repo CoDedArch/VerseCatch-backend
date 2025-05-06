@@ -38,7 +38,7 @@ def create_verification_token(data: dict):
 
 
 async def send_verification_email(email: str, token: str):
-    verification_url = f"https://6c9b-129-224-201-49.ngrok-free.app/auth/verify?token={token}"
+    verification_url = f"https://dafe-129-224-201-170.ngrok-free.app/auth/verify?token={token}"
     sender_mail = "kelvingbolo98@gmail.com"
     
     # Create a multipart message
@@ -75,13 +75,17 @@ async def send_verification_email(email: str, token: str):
 
     try:
         with smtplib.SMTP("smtp.gmail.com", 587) as server:
-            print("in")
             server.starttls()
-            print("in")
             server.login(sender_mail, "gphc tfvg dwhc rkel")
             server.sendmail(sender_mail, [email], msg.as_string())
-            print("out")
-        print(f"Verification email sent to {email}")
     except smtplib.SMTPException as e:
-        print(f"Failed to send email: {e}")
         raise HTTPException(status_code=500, detail="Failed to send verification email")
+    
+def verify_paystack_signature(payload: bytes, signature: str) -> bool:
+    secret = os.getenv("PAYSTACK_SECRET_KEY")
+    computed_signature = hmac.new(
+        secret.encode('utf-8'),
+        msg=payload,
+        digestmod=hashlib.sha512
+    ).hexdigest()
+    return hmac.compare_digest(computed_signature, signature)
