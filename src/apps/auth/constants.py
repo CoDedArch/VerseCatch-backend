@@ -1,0 +1,17 @@
+inspirational_verses = [
+    {"book": "Psalms", "chapter": 23, "verse": 1, "text": "The Lord is my shepherd; I shall not want."},
+    {"book": "Proverbs", "chapter": 3, "verse": 5, "text": "Trust in the Lord with all your heart and lean not on your own understanding."},
+    {"book": "Isaiah", "chapter": 40, "verse": 31, "text": "But they that wait upon the Lord shall renew their strength; they shall mount up with wings as eagles."},
+    {"book": "Philippians", "chapter": 4, "verse": 13, "text": "I can do all things through Christ who strengthens me."},
+    {"book": "Jeremiah", "chapter": 29, "verse": 11, "text": "For I know the plans I have for you, declares the Lord, plans to prosper you and not to harm you, plans to give you hope and a future."},
+    {"book": "Romans", "chapter": 8, "verse": 28, "text": "And we know that in all things God works for the good of those who love him, who have been called according to his purpose."},
+    {"book": "Matthew", "chapter": 11, "verse": 28, "text": "Come to me, all you who are weary and burdened, and I will give you rest."},
+    {"book": "Joshua", "chapter": 1, "verse": 9, "text": "Have I not commanded you? Be strong and courageous. Do not be afraid; do not be discouraged, for the Lord your God will be with you wherever you go."},
+    {"book": "2 Timothy", "chapter": 1, "verse": 7, "text": "For the Spirit God gave us does not make us timid, but gives us power, love and self-discipline."},
+    {"book": "John", "chapter": 16, "verse": 33, "text": "I have told you these things, so that in me you may have peace. In this world you will have trouble. But take heart! I have overcome the world."},
+    {"book": "Psalm", "chapter": 46, "verse": 1, "text": "God is our refuge and strength, an ever-present help in trouble."},
+    {"book": "Isaiah", "chapter": 41, "verse": 10, "text": "So do not fear, for I am with you; do not be dismayed, for I am your God. I will strengthen you and help you; I will uphold you with my righteous right hand."},
+    {"book": "Hebrews", "chapter": 11, "verse": 1, "text": "Now faith is confidence in what we hope for and assurance about what we do not see."},
+    {"book": "1 Peter", "chapter": 5, "verse": 7, "text": "Cast all your anxiety on him because he cares for you."},
+    {"book": "Deuteronomy", "chapter": 31, "verse": 6, "text": "Be strong and courageous. Do not be afraid or terrified because of them, for the Lord your God goes with you; he will never leave you nor forsake you."},
+]
