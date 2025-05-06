@@ -1,12 +1,29 @@
 from datetime import datetime
 from typing import List
 from uuid import uuid4, UUID as PyUUID
-from sqlalchemy import ForeignKey, String, Integer, text, Column, Boolean, DateTime, CheckConstraint
+from sqlalchemy import ForeignKey, String, Integer, text, Column, Boolean, DateTime, CheckConstraint, Numeric
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 from core.database import Base
 from sqlalchemy import JSON
+from sqlalchemy.types import TypeDecorator, VARCHAR
+import json
+
+class JSONEncodedDict(TypeDecorator):
+    """Represents a JSON-encoded dictionary."""
+    
+    impl = VARCHAR
+
+    def process_bind_param(self, value, dialect):
+        if value is not None:
+            value = json.dumps(value)
+        return value
+
+    def process_result_value(self, value, dialect):
+        if value is not None:
+            value = json.loads(value)
+        return value
 
 
 
@@ -116,14 +133,24 @@ class User(Base):
     bible_version = Column(String, nullable=True)
     has_taken_tour: Mapped[bool] = mapped_column(Boolean, default=False)
     current_theme_id: Mapped[PyUUID] = mapped_column(ForeignKey("themes.id"), nullable=True)
+    last_inspirational_verse: Mapped[str] = mapped_column(JSONEncodedDict, nullable=True)
+    next_inspirational_verse_time: Mapped[DateTime] = mapped_column(DateTime, nullable=True)
+    needs_next_verse: Mapped[bool] = mapped_column(Boolean, default=False)  # New field
+    
     achievements: Mapped[List["Achievement"]] = relationship(
         "Achievement", back_populates="user", cascade="all, delete-orphan"
     )
+
     activities: Mapped[List["UserActivity"]] = relationship(
         "UserActivity", back_populates="user", cascade="all, delete-orphan"
     )
+
     themes: Mapped[List["UserTheme"]] = relationship(
         "UserTheme", back_populates="user", cascade="all, delete-orphan"
+    )
+
+    payments: Mapped[List["Payment"]] = relationship(
+    "Payment", back_populates="user", cascade="all, delete-orphan"
     )
 
     __table_args__ = (
@@ -137,6 +164,16 @@ class User(Base):
             return False
         return self.last_login.date() == datetime.utcnow().date()
 
+    def check_next_verse_status(self):
+        """Check if the user needs the next verse based on the countdown."""
+        current_status = self.needs_next_verse
+        new_status = bool(self.next_inspirational_verse_time and datetime.utcnow() >= self.next_inspirational_verse_time)
+        
+        if current_status != new_status:
+            self.needs_next_verse = new_status
+            return True  
+        return False
+
     def __repr__(self):
         return f"<User(id={self.id}, email={self.email}, streak={self.streak})>"
     
@@ -149,3 +186,31 @@ class UnverifiedUser(Base):
     password = Column(String)
     bible_version = Column(String)
     verification_token = Column(String)
+
+
+# Add to your models.py
+class Payment(Base):
+    __tablename__ = "payments"
+
+    id: Mapped[PyUUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, server_default=text("uuid_generate_v4()")
+    )
+    user_id: Mapped[PyUUID] = mapped_column(ForeignKey("users.id"), index=True)
+    amount: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
+    currency: Mapped[str] = mapped_column(String(3), default="GHS")
+    paystack_reference: Mapped[str] = mapped_column(String, unique=True)
+    status: Mapped[str] = mapped_column(String, default="pending")  # pending, success, failed
+    payment_method: Mapped[str] = mapped_column(String)  # card, mobile_money, etc.
+    metadata: Mapped[dict] = mapped_column(JSONEncodedDict)
+    created_at: Mapped[DateTime] = mapped_column(DateTime, server_default=func.now())
+    completed_at: Mapped[DateTime] = mapped_column(DateTime, nullable=True)
+
+    user: Mapped["User"] = relationship("User", back_populates="payments")
+
+    __table_args__ = (
+        CheckConstraint("amount > 0", name="check_amount_positive"),
+    )
+
+    @property
+    def is_successful(self) -> bool:
+        return self.status == "success"
