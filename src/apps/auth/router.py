@@ -8,7 +8,7 @@ from datetime import datetime, timedelta, timezone
 from core.database import aget_db
 from apps.requotes.models import User, UserActivity,Achievement, UnverifiedUser, UserTheme, Theme, Payment
 from apps.auth.schemas import UserCreate, LoginRequest, Token, EmailCheckRequest, EmailCheckResponse, SignupResponse
-from apps.auth.utils import get_password_hash, verify_password, create_access_token, create_verification_token, send_verification_email, SECRET_KEY, ALGORITHM
+from apps.auth.utils import get_password_hash, verify_password, create_access_token, create_verification_token, send_verification_email, SECRET_KEY, ALGORITHM, verify_paystack_signature
 from sqlalchemy import select, func, distinct, delete
 from sqlalchemy.orm import selectinload
 from fastapi import WebSocket, WebSocketDisconnect
@@ -873,16 +873,6 @@ async def verify_payment(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-
-
-def verify_paystack_signature(payload: bytes, signature: str) -> bool:
-    secret = os.getenv("PAYSTACK_SECRET_KEY")
-    computed_signature = hmac.new(
-        secret.encode('utf-8'),
-        msg=payload,
-        digestmod=hashlib.sha512
-    ).hexdigest()
-    return hmac.compare_digest(computed_signature, signature)
 
 # Verify PayStack Signature
 @router.post("/api/payment-webhook")
