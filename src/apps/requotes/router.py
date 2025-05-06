@@ -42,7 +42,6 @@ async def track_verse_catch(session, user, book_name):
         print("Created new UserActivity record for verse_caught")
 
         
-        print(f"Updated faith_coins to {user.faith_coins}")
 
         # Count total verses caught
         total_verses = await session.scalar(
@@ -54,7 +53,8 @@ async def track_verse_catch(session, user, book_name):
         print(f"Total verses caught: {total_verses}")
         
         # Increase faith_coins by 2
-        user.faith_coins += total_verses * 2 
+        user.faith_coins = total_verses * 2 
+        print(f"Updated faith_coins to {user.faith_coins}")
 
         # Award "Verse Catcher" after 100 verses
         if total_verses >= 100:  # Change this to 100 for the actual requirement
@@ -103,11 +103,11 @@ async def track_sharing(session, user):
 async def executeTrackVerseCatch(data: dict, session: AsyncSession = Depends(aget_db)):
     try:
         print(f"Received data: {data}")
-        user = await session.scalar(select(User).where(User.email == data.email))
+        user = await session.scalar(select(User).where(User.email == data["email"]))
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
 
-        await track_verse_catch(session, user, data.book_name)
+        await track_verse_catch(session, user, data["book_name"])
     except HTTPException as he:
         print(f"HTTPException in track_verse_catch: {he.detail}")
         raise he
