@@ -59,7 +59,7 @@ async def track_verse_catch(session, user, book_name):
         # Award "Verse Catcher" after 100 verses
         if total_verses >= 100:  # Change this to 100 for the actual requirement
             print("Awarding Verse Catcher achievement")
-            await award_achievement(session, user, "Verse Catcher", "Verse Catcher", 100)
+            await award_achievement(session, user, "Verse Catcher", "Verse Catcher", "Catch 100 verses")
 
         # Track unique books caught
         unique_books = await session.scalars(
@@ -72,9 +72,9 @@ async def track_verse_catch(session, user, book_name):
         print(f"Unique books caught: {unique_books}")
 
         # Award "Bible Explorer" after catching verses from 5 unique books
-        if len(unique_books) >= 60:  # Change this to 5 for the actual requirement
+        if len(unique_books) >= 60:
             print("Awarding Bible Explorer achievement")
-            await award_achievement(session, user, "Bible Explorer", "Bible Explorer", 60)
+            await award_achievement(session, user, "Bible Explorer", "Bible Explorer", "Catch from 60 Unique books")
 
         # Commit changes to the database
         await session.commit()
@@ -94,7 +94,7 @@ async def track_sharing(session, user):
     )
 
     if total_shared >= 50:
-        await award_achievement(session, user, "Sharing Saint", "Sharing Saint", 50)
+        await award_achievement(session, user, "Sharing Saint", "Sharing Saint", "Share 50 caught Verses")
 
     await session.commit()
 

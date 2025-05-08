@@ -64,7 +64,7 @@ class Achievement(Base):
     user_id: Mapped[PyUUID] = mapped_column(ForeignKey("users.id"))
     name: Mapped[str] = mapped_column(String, nullable=False)
     tag: Mapped[str] = mapped_column(String, nullable=False)
-    requirement: Mapped[int] = mapped_column(Integer, nullable=False)
+    requirement: Mapped[str] = mapped_column(String, nullable=False)
     achieved_at: Mapped[DateTime] = mapped_column(DateTime, server_default=func.now())
 
     user: Mapped["User"] = relationship("User", back_populates="achievements")
@@ -135,8 +135,9 @@ class User(Base):
     current_theme_id: Mapped[PyUUID] = mapped_column(ForeignKey("themes.id"), nullable=True)
     last_inspirational_verse: Mapped[str] = mapped_column(JSONEncodedDict, nullable=True)
     next_inspirational_verse_time: Mapped[DateTime] = mapped_column(DateTime, nullable=True)
-    needs_next_verse: Mapped[bool] = mapped_column(Boolean, default=False)  # New field
-    
+    needs_next_verse: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_supporter: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+
     achievements: Mapped[List["Achievement"]] = relationship(
         "Achievement", back_populates="user", cascade="all, delete-orphan"
     )
@@ -200,8 +201,12 @@ class Payment(Base):
     currency: Mapped[str] = mapped_column(String(3), default="GHS")
     paystack_reference: Mapped[str] = mapped_column(String, unique=True)
     status: Mapped[str] = mapped_column(String, default="pending")  # pending, success, failed
-    payment_method: Mapped[str] = mapped_column(String)  # card, mobile_money, etc.
-    metadata: Mapped[dict] = mapped_column(JSONEncodedDict)
+    payment_method: Mapped[str] = mapped_column(String, nullable=True)
+    payment_metadata: Mapped[dict] = mapped_column(  # Changed from 'metadata' to 'payment_metadata'
+        JSONEncodedDict, 
+        name="metadata",
+        comment="Stores payment metadata like donation type and original USD amount"
+    )
     created_at: Mapped[DateTime] = mapped_column(DateTime, server_default=func.now())
     completed_at: Mapped[DateTime] = mapped_column(DateTime, nullable=True)
 
