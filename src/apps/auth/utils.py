@@ -1,8 +1,10 @@
 from passlib.context import CryptContext
-from jose import JWTError, jwt
+from jose import jwt
 from datetime import datetime, timedelta
 from core.config import settings
-import secrets
+import hmac
+import os
+import hashlib
 import smtplib
 from fastapi import HTTPException
 from email.mime.multipart import MIMEMultipart
@@ -38,7 +40,7 @@ def create_verification_token(data: dict):
 
 
 async def send_verification_email(email: str, token: str):
-    verification_url = f"https://dafe-129-224-201-170.ngrok-free.app/auth/verify?token={token}"
+    verification_url = f"https://3bfa-129-224-201-211.ngrok-free.app/auth/verify?token={token}"
     sender_mail = "kelvingbolo98@gmail.com"
     
     # Create a multipart message
