@@ -13,11 +13,10 @@ from sqlalchemy import select, func, distinct, delete
 from sqlalchemy.orm import selectinload
 from fastapi import WebSocket, WebSocketDisconnect
 from core.security import verify_api_key
+from core.config import settings
 import random
 import json
 import os
-import hmac
-import hashlib
 import httpx
 from . constants import inspirational_verses
 
@@ -280,6 +279,27 @@ async def websocket_user_details(websocket: WebSocket, db: AsyncSession = Depend
         )
         achievements = achievements_result.scalars().all()
 
+        # Get user's payment status
+        payments_result = await db.execute(
+            select(Payment)
+            .where(Payment.user_id == db_user.id)
+            .order_by(Payment.completed_at.desc())
+        )
+        payments = payments_result.scalars().all()
+
+        # Determine payment status
+        has_paid = len(payments) > 0
+        last_payment = payments[0] if has_paid else None
+        payment_status = {
+            "has_paid": has_paid,
+            "last_payment_date": last_payment.created_at.isoformat() if last_payment else None,
+            "last_payment_amount": float(last_payment.amount) if last_payment else None,
+            "last_payment_currency": last_payment.currency if last_payment else None,
+            "is_supporter": db_user.is_supporter,
+            "total_payments": len(payments),
+            "total_donated": float(sum(p.amount for p in payments)) if payments else 0
+        }
+
         # Sort achievements by achieved_at to get the most recent one
         if achievements:
             most_recent_achievement = max(achievements, key=lambda a: a.achieved_at)
@@ -310,7 +330,7 @@ async def websocket_user_details(websocket: WebSocket, db: AsyncSession = Depend
             db_user.streak += 1
             if db_user.streak >= 7:
                 db_user.current_tag = "Daily Devotee"
-                await award_achievement(db, db_user, "Daily Devotee", "Daily Devotee", 7)
+                await award_achievement(db, db_user, "Daily Devotee", "Daily Devotee", "Login for 7 Conservative days")
             await db.commit()
 
         # Send initial user details
@@ -328,7 +348,8 @@ async def websocket_user_details(websocket: WebSocket, db: AsyncSession = Depend
             "logged_in_today": logged_in_today,
             "total_verses_caught": total_verses_caught,
             "unique_books_caught": unique_books_caught,
-            "has_taken_tour": db_user.has_taken_tour,  # Include the new field
+            "has_taken_tour": db_user.has_taken_tour,
+            "payment_status": payment_status,
             "achievements": [
                 {
                     "id": str(achievement.id),
@@ -358,6 +379,26 @@ async def websocket_user_details(websocket: WebSocket, db: AsyncSession = Depend
                     select(Achievement).where(Achievement.user_id == db_user.id)
                 )
                 achievements = achievements_result.scalars().all()
+                # Get user's payment status
+                payments_result = await db.execute(
+                    select(Payment)
+                    .where(Payment.user_id == db_user.id)
+                    .order_by(Payment.completed_at.desc())
+                )
+                payments = payments_result.scalars().all()
+
+                # Determine payment status
+                has_paid = len(payments) > 0
+                last_payment = payments[0] if has_paid else None
+                payment_status = {
+                    "has_paid": has_paid,
+                    "last_payment_date": last_payment.created_at.isoformat() if last_payment else None,
+                    "last_payment_amount": float(last_payment.amount) if last_payment else None,
+                    "last_payment_currency": last_payment.currency if last_payment else None,
+                    "is_supporter": db_user.is_supporter,
+                    "total_payments": len(payments),
+                    "total_donated": float(sum(p.amount for p in payments)) if payments else 0
+                }
 
                 # Sort achievements by achieved_at to get the most recent one
                 if achievements:
@@ -396,7 +437,8 @@ async def websocket_user_details(websocket: WebSocket, db: AsyncSession = Depend
                     "logged_in_today": logged_in_today,
                     "total_verses_caught": total_verses_caught,
                     "unique_books_caught": unique_books_caught,
-                    "has_taken_tour": db_user.has_taken_tour,  # Include the new field
+                    "has_taken_tour": db_user.has_taken_tour,
+                    "payment_status": payment_status,
                     "achievements": [
                         {
                             "id": str(achievement.id),
@@ -682,7 +724,18 @@ async def get_inspirational_verses(
             achievement.tag == "Daily Devotee" 
             for achievement in user.achievements
         )
-        cache_minutes = 5 if has_daily_devotee else 30
+        has_supporter = any(
+            achievement.tag == "Supporter" 
+            for achievement in user.achievements
+        )
+
+        # Determine cache time (priority: Supporter > Daily Devotee > Default)
+        if has_supporter:
+            cache_minutes = 5
+        elif has_daily_devotee:
+            cache_minutes = 15
+        else:
+            cache_minutes = 30
 
         try:
             print("Updating user with new verse")
@@ -742,127 +795,221 @@ async def create_payment(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    amount = data.get("amount")
+    amount = data["amount"]
     if not amount or amount <= 0:
         raise HTTPException(status_code=400, detail="Invalid amount")
 
     # Generate unique reference
-    reference = f"VC-{datetime.now().strftime('%Y%m%d')}-{random.randint(1000, 9999)}"
-
-    # Create payment record
-    # Fetch real exchange rate from an external API
     try:
-        async with httpx.AsyncClient() as client:
-            response = await client.get("https://api.exchangerate-api.com/v4/latest/GHS")
-        exchange_data = response.json()
-        usd_rate = exchange_data["rates"].get("USD", 12)  # Default to 12 if USD rate is not found
-    except Exception as e:
-        usd_rate = 12  # Fallback to default rate in case of an error
+        reference = f"VC-{datetime.now().strftime('%Y%m%d')}-{random.randint(1000, 9999)}"
 
-    new_payment = Payment(
-        user_id=user.id,
-        amount=amount,
-        currency="GHS",
-        paystack_reference=reference,
-        status="pending",
-        metadata={
-            "donation_type": "supporter" if amount >= 5 else "standard",
-            "original_usd_amount": amount / usd_rate  
-        }
-    )
-    db.add(new_payment)
-    await db.commit()
+        # Create payment record
 
-    # Initialize Paystack payment
-    try:
-        payload = {
-            "email": email,
-            "amount": int(amount * 100),  # Convert to pesewas
-            "reference": reference,
-            "currency": "GHS",
-            "callback_url": f"{os.getenv('BASE_URL')}/payment/verify",
-            "metadata": {
-                "payment_id": str(new_payment.id),
-                "user_id": str(user.id)
+        new_payment = Payment(
+            user_id=user.id,
+            amount=amount,
+            currency="GHS",
+            paystack_reference=reference,
+            status="pending",
+            payment_metadata={
+                "donation_type": "supporter" if data.get("metadata", {}).get("originalUsdAmount", 0) >= 5 else "standard",
+                "original_usd_amount": data.get("metadata", {}).get("originalUsdAmount", 0)
             }
-        } 
-        headers={
-                "Authorization": f"Bearer {os.getenv('PAYSTACK_SECRET_KEY')}",
-                "Content-Type": "application/json"
-            }
-        
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                "https://api.paystack.co/transaction/initialize",
-                json=payload,
-                headers=headers
-            )
-        data = response.json()
-        if response.status_code != 200 or not data.get("status"):
-            raise Exception(data.get("message", "Unknown error from Paystack"))
-        return {
-            "authorization_url": response.data["data"]["authorization_url"],
-            "reference": reference
-        }
-    
-    except Exception as e:
-        new_payment.status = "failed"
-        new_payment.metadata["error"] = str(e)
+        )
+        db.add(new_payment)
         await db.commit()
-        raise HTTPException(status_code=500, detail="Payment initialization failed")
+        print(f"Created payment with reference: {reference}")
+        return {
+                "reference": reference,
+                "status": "pending",
+                "payment_id": str(new_payment.id)
+        }
+    except Exception as e:
+        print(f"Payment creation failed: {str(e)}") 
+        raise HTTPException(status_code=500, detail=str(e))
+    # # Initialize Paystack payment
+    # try:
+    #     payload = {
+    #         "email": email,
+    #         "amount": int(amount * 100),  # Convert to pesewas
+    #         "reference": reference,
+    #         "currency": "GHS",
+    #         "callback_url": f"{os.getenv('BASE_URL')}/payment/verify",
+    #         "metadata": {
+    #             "payment_id": str(new_payment.id),
+    #             "user_id": str(user.id)
+    #         }
+    #     } 
+    #     headers={
+    #             "Authorization": f"Bearer {os.getenv('PAYSTACK_SECRET_KEY')}",
+    #             "Content-Type": "application/json"
+    #         }
+        
+    #     async with httpx.AsyncClient() as client:
+    #         response = await client.post(
+    #             "https://api.paystack.co/transaction/initialize",
+    #             json=payload,
+    #             headers=headers
+    #         )
+    #     data = response.json()
+    #     if response.status_code != 200 or not data.get("status"):
+    #         raise Exception(data.get("message", "Unknown error from Paystack"))
+    #     return {
+    #         "authorization_url": response.data["data"]["authorization_url"],
+    #         "reference": reference
+    #     }
+    
+    # except Exception as e:
+    #     new_payment.status = "failed"
+    #     new_payment.metadata["error"] = str(e)
+    #     await db.commit()
+    #     raise HTTPException(status_code=500, detail="Payment initialization failed")
     
 # Payment Verification Endpoint
 @router.post("/api/verify-payment")
 async def verify_payment(
     data: dict,
-    db: AsyncSession = Depends(aget_db)
+    db: AsyncSession = Depends(aget_db),
+    token: str = Depends(oauth2_scheme)
 ):
-    reference = data.get("reference")
-    if not reference:
-        raise HTTPException(status_code=400, detail="Reference required")
-
-    # Verify with Paystack
     try:
-        url = f"https://api.paystack.co/transaction/verify/{reference}"
-        headers = {
-            "Authorization": f"Bearer {os.getenv('PAYSTACK_SECRET_KEY')}"
-        }
+        # Authentication
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        email = payload.get("sub")
+        if not email:
+            raise HTTPException(status_code=401, detail="Invalid token")
 
-        async with httpx.AsyncClient() as client:
-            response = await client.get(url, headers=headers)
+        # Get user
+        user_result = await db.execute(select(User).where(User.email == email))
+        user = user_result.scalar_one_or_none()
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
 
-        data = response.data["data"]
-        
-        # Update payment record
+        reference = data.get("reference")
+        if not reference:
+            raise HTTPException(status_code=400, detail="Reference required")
+
+        print(f"Verifying payment with reference: {reference}")
+
+        # Check if payment exists in our database
         result = await db.execute(
             select(Payment)
             .where(Payment.paystack_reference == reference)
         )
         payment = result.scalar_one_or_none()
-        
-        if not payment:
-            raise HTTPException(status_code=404, detail="Payment not found")
 
-        if data["status"] == "success":
-            payment.status = "success"
-            payment.payment_method = data["channel"]
-            payment.completed_at = datetime.now()
-            
-            # Update user status if supporter donation
-            if payment.amount >= 5:
-                user = await db.get(User, payment.user_id)
-                user.is_supporter = True
-                db.add(user)
-            
-            await db.commit()
-            return {"status": "success"}
-        else:
-            payment.status = "failed"
-            await db.commit()
-            return {"status": "failed"}
-            
+        if not payment:
+            print(f"No local payment found for reference: {reference}")
+            # Verify with Paystack
+            try:
+                paystack_secret = os.getenv('PAYSTACK_SECRET_KEY')
+
+                url = f"https://api.paystack.co/transaction/verify/{reference}"
+                headers = {"Authorization": f"Bearer {paystack_secret}"}
+
+                async with httpx.AsyncClient() as client:
+                    paystack_response = await client.get(url, headers=headers)
+                    paystack_data = paystack_response.json()
+
+                if paystack_response.status_code != 200 or not paystack_data.get("status"):
+                    raise HTTPException(
+                        status_code=404,
+                        detail="Payment not found in Paystack"
+                    )
+
+                # Create payment record from Paystack data
+                paystack_amount = paystack_data["data"]["amount"] / 100  # Convert from pesewas
+                metadata = {
+                    "donation_type": "standard",
+                    "original_usd_amount": 0  # Will be updated if we can calculate
+                }
+
+                # Try to get original USD amount if possible
+                if "metadata" in paystack_data["data"]:
+                    metadata["original_usd_amount"] = paystack_data["data"]["metadata"].get(
+                        "originalUsdAmount", 0
+                    )
+
+                payment = Payment(
+                    user_id=user.id,
+                    amount=paystack_amount,
+                    currency=paystack_data["data"]["currency"],
+                    paystack_reference=reference,
+                    status="pending",
+                    payment_metadata=metadata
+                )
+                db.add(payment)
+                await db.commit()
+                await db.refresh(payment)
+                print(f"Created new payment record from Paystack: {payment.id}")
+
+            except Exception as e:
+                print(f"Paystack verification failed: {str(e)}")
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Could not verify payment with Paystack: {str(e)}"
+                )
+
+        print("PayStack_SECRETE_KEY: ", paystack_secret)
+        # Final verification with Paystack
+        url = f"https://api.paystack.co/transaction/verify/{reference}"
+        headers = {"Authorization": f"Bearer {paystack_secret}"}
+
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url, headers=headers)
+            response_data = response.json()
+
+        if response.status_code != 200 or not response_data.get("status"):
+            print(f"Paystack verification failed: {response_data}")
+            raise HTTPException(
+                status_code=400,
+                detail=response_data.get("message", "Payment verification failed")
+            )
+
+        transaction_data = response_data["data"]
+        
+        # Update payment record
+        payment.status = transaction_data["status"]
+        payment.payment_method = transaction_data.get("channel")
+        payment.completed_at = datetime.now()
+        
+        # Update metadata if needed
+        if "metadata" in transaction_data:
+            payment.payment_metadata.update(transaction_data["metadata"])
+
+        # Handle supporter status
+        original_usd_amount = payment.payment_metadata.get("original_usd_amount", 0)
+        is_supporter = original_usd_amount >= 5
+
+        if is_supporter and user:
+            await award_achievement(
+                db, 
+                user, 
+                "VerseCatch Supporter", 
+                "Supporter", 
+                "Donated at least 5 USD equivalent"
+            )
+            user.is_supporter = True
+            db.add(user)
+
+        await db.commit()
+
+        return {
+            "status": "success",
+            "isSupporter": is_supporter,
+            "payment_id": str(payment.id),
+            "amount": payment.amount,
+            "currency": payment.currency
+        }
+
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"Payment verification error: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail="An error occurred while verifying payment"
+        )
 
 
 # Verify PayStack Signature
