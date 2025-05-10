@@ -23,7 +23,10 @@ class Settings(BaseSettings):
     SECRET_KEY: str = Field(env="SECRET_KEY")
     ALGORITHM: str = Field(env="ALGORITHM")
     ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(env="ACCESS_TOKEN_EXPIRE", default=30)
-    
+    SENDGRID_API_KEY: str = os.getenv("SENDGRID_API_KEY")
+    EMAIL_FROM: str = os.getenv("EMAIL_FROM", "no-reply@versecatch.pro")
+    BASE_URL: str = os.getenv("BASE_URL", "https://versecatch.pro")
+    PAYSTACK_SECRET_KEY: str = os.getenv("PAYSTACK_SECRET_KEY")
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"

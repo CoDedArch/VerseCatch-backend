@@ -8,7 +8,7 @@ from datetime import datetime, timedelta, timezone
 from core.database import aget_db
 from apps.requotes.models import User, UserActivity,Achievement, UnverifiedUser, UserTheme, Theme, Payment
 from apps.auth.schemas import UserCreate, LoginRequest, Token, EmailCheckRequest, EmailCheckResponse, SignupResponse
-from apps.auth.utils import get_password_hash, verify_password, create_access_token, create_verification_token, send_verification_email, SECRET_KEY, ALGORITHM, verify_paystack_signature
+from apps.auth.utils import get_password_hash, verify_password, create_access_token, create_verification_token, send_verification_email, verify_paystack_signature
 from sqlalchemy import select, func, distinct, delete
 from sqlalchemy.orm import selectinload
 from fastapi import WebSocket, WebSocketDisconnect
@@ -123,7 +123,7 @@ async def verify_email(token: str, db: AsyncSession = Depends(aget_db)):
         detail="Invalid verification token",
     )
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         email: str = payload.get("sub")
         if email is None:
             raise credentials_exception
@@ -258,7 +258,7 @@ async def websocket_user_details(websocket: WebSocket, db: AsyncSession = Depend
 
         # Decode the token to get the user's email
         try:
-            payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+            payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
             email: str = payload.get("sub")
             if email is None:
                 await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
@@ -469,7 +469,7 @@ async def change_password(
     token: str = Depends(oauth2_scheme)
 ):
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         email: str = payload.get("sub")
         if email is None:
             raise HTTPException(status_code=401, detail="Invalid token")
@@ -506,7 +506,7 @@ async def get_themes(
     token: str = Depends(oauth2_scheme)
 ):
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         email: str = payload.get("sub")
         if email is None:
             raise HTTPException(status_code=401, detail="Invalid token")
@@ -553,7 +553,7 @@ async def unlock_theme(
     token: str = Depends(oauth2_scheme)
 ):
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         email: str = payload.get("sub")
         if email is None:
             raise HTTPException(status_code=401, detail="Invalid token")
@@ -631,7 +631,7 @@ async def set_theme(
     token: str = Depends(oauth2_scheme)
 ):
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         email: str = payload.get("sub")
         print(email)
         if email is None:
@@ -677,7 +677,7 @@ async def get_inspirational_verses(
     try:
         # Authentication
         try:
-            payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+            payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
             if (email := payload.get("sub")) is None:
                 raise HTTPException(status_code=401, detail="Invalid token credentials")
         except JWTError as e:
@@ -782,7 +782,7 @@ async def create_payment(
 ):
     print("Payment Request Recieved")
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         email = payload.get("sub")
         if not email:
             raise HTTPException(status_code=401, detail="Invalid token")
@@ -902,10 +902,9 @@ async def verify_payment(
             print(f"No local payment found for reference: {reference}")
             # Verify with Paystack
             try:
-                paystack_secret = os.getenv('PAYSTACK_SECRET_KEY')
 
                 url = f"https://api.paystack.co/transaction/verify/{reference}"
-                headers = {"Authorization": f"Bearer {paystack_secret}"}
+                headers = {"Authorization": f"Bearer {settings.PAYSTACK_SECRET_KEY}"}
 
                 async with httpx.AsyncClient() as client:
                     paystack_response = await client.get(url, headers=headers)
@@ -950,10 +949,9 @@ async def verify_payment(
                     detail=f"Could not verify payment with Paystack: {str(e)}"
                 )
 
-        print("PayStack_SECRETE_KEY: ", paystack_secret)
         # Final verification with Paystack
         url = f"https://api.paystack.co/transaction/verify/{reference}"
-        headers = {"Authorization": f"Bearer {paystack_secret}"}
+        headers = {"Authorization": f"Bearer {settings.PAYSTACK_SECRET_KEY}"}
 
         async with httpx.AsyncClient() as client:
             response = await client.get(url, headers=headers)
