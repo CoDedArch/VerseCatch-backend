@@ -12,7 +12,7 @@ from uuid import uuid4
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
-from apps.requotes.models import Verse, Version, Theme
+from apps.requotes.models import Theme
 from _db import session_manager
 
 THEMES = [
