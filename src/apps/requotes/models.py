@@ -1,13 +1,15 @@
 from datetime import datetime
 from typing import List
 from uuid import uuid4, UUID as PyUUID
-from sqlalchemy import ForeignKey, String, Integer, text, Column, Boolean, DateTime, CheckConstraint, Numeric
+from sqlalchemy import ForeignKey, String, Integer, text, Column, Boolean, DateTime, CheckConstraint, Numeric, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+from typing import Optional
 from sqlalchemy.sql import func
 from core.database import Base
 from sqlalchemy import JSON
 from sqlalchemy.types import TypeDecorator, VARCHAR
+from sqlalchemy.ext.hybrid import hybrid_property
 import json
 
 class JSONEncodedDict(TypeDecorator):
@@ -137,6 +139,10 @@ class User(Base):
     next_inspirational_verse_time: Mapped[DateTime] = mapped_column(DateTime, nullable=True)
     needs_next_verse: Mapped[bool] = mapped_column(Boolean, default=False)
     is_supporter: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    has_rated: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    rating: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    rating_feedback: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    rated_at: Mapped[Optional[DateTime]] = mapped_column(DateTime, nullable=True)
 
     achievements: Mapped[List["Achievement"]] = relationship(
         "Achievement", back_populates="user", cascade="all, delete-orphan"
@@ -152,6 +158,10 @@ class User(Base):
 
     payments: Mapped[List["Payment"]] = relationship(
     "Payment", back_populates="user", cascade="all, delete-orphan"
+    )
+
+    ratings: Mapped[List["Rating"]] = relationship(
+    "Rating", back_populates="user", cascade="all, delete-orphan"
     )
 
     __table_args__ = (
@@ -174,6 +184,19 @@ class User(Base):
             self.needs_next_verse = new_status
             return True  
         return False
+    
+    @hybrid_property
+    def rating_description(self) -> Optional[str]:
+        if not self.rating:
+            return None
+        rating_descriptions = {
+            1: "Worse - Needs work",
+            2: "Good - Has potential",
+            3: "Better - Good but could improve",
+            4: "Best - Really enjoying it",
+            5: "Excellent - Perfect experience!"
+        }
+        return rating_descriptions.get(self.rating)
 
     def __repr__(self):
         return f"<User(id={self.id}, email={self.email}, streak={self.streak})>"
@@ -219,3 +242,21 @@ class Payment(Base):
     @property
     def is_successful(self) -> bool:
         return self.status == "success"
+    
+
+class Rating(Base):
+    __tablename__ = "ratings"
+
+    id: Mapped[PyUUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, server_default=text("uuid_generate_v4()")
+    )
+    user_id: Mapped[PyUUID] = mapped_column(ForeignKey("users.id"), nullable=False)
+    rating: Mapped[int] = mapped_column(Integer, nullable=False)
+    feedback: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[DateTime] = mapped_column(DateTime, server_default=func.now())
+
+    user: Mapped["User"] = relationship("User", back_populates="ratings")
+
+    __table_args__ = (
+        CheckConstraint("rating >= 1 AND rating <= 5", name="check_rating_range"),
+    )
