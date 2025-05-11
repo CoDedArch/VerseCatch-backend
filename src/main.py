@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from core.database import session_manager
+from .core.database import session_manager
 from apps.requotes.models import Base
 from apps.requotes.router import router as bible_quotes_router
 from apps.auth.router import router as auth_router
