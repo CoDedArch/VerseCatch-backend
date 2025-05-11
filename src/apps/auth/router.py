@@ -1,24 +1,22 @@
 import asyncio
-from fastapi import APIRouter, Depends, HTTPException, status, Request
-from fastapi.security import OAuth2PasswordBearer
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import text
+import random
+import json
+import httpx
 from jose import JWTError, jwt
-from datetime import datetime, timedelta, timezone
+from core.config import settings
 from core.database import aget_db
+from sqlalchemy.orm import selectinload
+from datetime import datetime, timedelta
+from core.security import verify_api_key
+from . constants import inspirational_verses
+from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi.security import OAuth2PasswordBearer
+from fastapi import WebSocket, WebSocketDisconnect
+from sqlalchemy import select, func, distinct, delete
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from apps.requotes.models import User, UserActivity,Achievement, UnverifiedUser, UserTheme, Theme, Payment, Rating
 from apps.auth.schemas import UserCreate, LoginRequest, Token, EmailCheckRequest, EmailCheckResponse, SignupResponse
 from apps.auth.utils import get_password_hash, verify_password, create_access_token, create_verification_token, send_verification_email, verify_paystack_signature
-from sqlalchemy import select, func, distinct, delete
-from sqlalchemy.orm import selectinload
-from fastapi import WebSocket, WebSocketDisconnect
-from core.security import verify_api_key
-from core.config import settings
-import random
-import json
-import os
-import httpx
-from . constants import inspirational_verses
 
 router = APIRouter()
 
@@ -515,11 +513,9 @@ async def get_themes(
     except JWTError:
         raise HTTPException(status_code=401, detail="Invalid token")
 
-    # Get user
     result = await db.execute(select(User).where(User.email == email))
     user = result.scalar_one_or_none()
 
-    # Get all themes
     themes_result = await db.execute(select(Theme))
     themes = themes_result.scalars().all()
 
@@ -568,11 +564,9 @@ async def unlock_theme(
     if not theme_id:
         raise HTTPException(status_code=400, detail="Theme ID is required")
 
-    # Get user
     result = await db.execute(select(User).where(User.email == email))
     user = result.scalar_one_or_none()
 
-    # Get theme
     result = await db.execute(select(Theme).where(Theme.id == theme_id))
     theme = result.scalar_one_or_none()
 
@@ -645,7 +639,6 @@ async def set_theme(
     if not theme_id:
         raise HTTPException(status_code=400, detail="Theme ID is required")
 
-    # Get user
     result = await db.execute(select(User).where(User.email == email))
     user = result.scalar_one_or_none()
 
@@ -744,7 +737,7 @@ async def get_inspirational_verses(
 
             verse_json = json.dumps(selected_verse)
             try:
-                json.loads(verse_json)  # Test roundtrip
+                json.loads(verse_json)
             except json.JSONDecodeError as e:
                 raise HTTPException(status_code=500, detail="Invalid verse data format")
 
@@ -752,7 +745,7 @@ async def get_inspirational_verses(
             user.next_inspirational_verse_time = current_time + timedelta(minutes=cache_minutes)
             db.add(user)
             try:
-                await db.flush()  # Will raise any integrity errors
+                await db.flush()
                 await db.commit()
                 print("User updated successfully")
         
@@ -791,7 +784,6 @@ async def create_payment(
     except JWTError:
         raise HTTPException(status_code=401, detail="Invalid token")
 
-    # Get user
     result = await db.execute(select(User).where(User.email == email))
     user = result.scalar_one_or_none()
     if not user:
@@ -804,8 +796,6 @@ async def create_payment(
     # Generate unique reference
     try:
         reference = f"VC-{datetime.now().strftime('%Y%m%d')}-{random.randint(1000, 9999)}"
-
-        # Create payment record
 
         new_payment = Payment(
             user_id=user.id,
@@ -875,13 +865,11 @@ async def verify_payment(
     token: str = Depends(oauth2_scheme)
 ):
     try:
-        # Authentication
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         email = payload.get("sub")
         if not email:
             raise HTTPException(status_code=401, detail="Invalid token")
 
-        # Get user
         user_result = await db.execute(select(User).where(User.email == email))
         user = user_result.scalar_one_or_none()
         if not user:
@@ -1052,6 +1040,7 @@ async def payment_webhook(
 
     return {"status": "success"}
 
+
 # Rating Endpoint
 @router.post("/api/submit-rating")
 async def submit_rating(
@@ -1069,7 +1058,6 @@ async def submit_rating(
     - message: str
     """
     try:
-        # Authentication
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         email = payload.get("sub")
         if not email:
@@ -1077,7 +1065,6 @@ async def submit_rating(
     except JWTError:
         raise HTTPException(status_code=401, detail="Invalid token")
 
-    # Validate input
     rating = data.get("rating")
     
     if rating is None:
@@ -1090,13 +1077,11 @@ async def submit_rating(
     except ValueError:
         raise HTTPException(status_code=400, detail="Rating must be an integer between 1 and 5")
 
-    # Get user
     result = await db.execute(select(User).where(User.email == email))
     user = result.scalar_one_or_none()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    # Check if user has already rated
     if user.has_rated:
         raise HTTPException(status_code=400, detail="You have already submitted a rating")
 
@@ -1113,7 +1098,6 @@ async def submit_rating(
     feedback = rating_descriptions.get(rating, "")
 
     try:
-        # Create a new Rating record
         new_rating = Rating(
             user_id=user.id,
             rating=rating,
@@ -1135,3 +1119,65 @@ async def submit_rating(
     except Exception as e:
         await db.rollback()
         raise HTTPException(status_code=500, detail="Failed to submit rating")
+
+
+@router.get("/admin/user-ratings")
+async def get_user_ratings(
+    db: AsyncSession = Depends(aget_db),
+    token: str = Depends(oauth2_scheme)
+):
+    """
+    Get all users with their ratings and feedback for admin dashboard
+    """
+    
+    result = await db.execute(
+        select(User)
+        .options(selectinload(User.ratings))
+        .where(User.has_rated == True)
+        .order_by(User.rated_at.desc())
+    )
+    users = result.scalars().all()
+    
+    ratings_data = []
+    for user in users:
+        ratings_data.append({
+            "id": str(user.id),
+            "user_name": user.user_name,
+            "email": user.email,
+            "rating": user.rating,
+            "rating_description": user.rating_description,
+            "feedback": user.rating_feedback,
+            "rated_at": user.rated_at.isoformat() if user.rated_at else None,
+            "is_supporter": user.is_supporter,
+            "total_verses_caught": await db.scalar(
+                select(func.count()).where(
+                    UserActivity.user_id == user.id,
+                    UserActivity.activity_type == "verse_caught"
+                )
+            )
+        })
+    
+    return {"users": ratings_data}
+
+
+@router.get("/admin/user-stats")
+async def get_user_stats(
+    db: AsyncSession = Depends(aget_db),
+    token: str = Depends(oauth2_scheme)
+):
+    """
+    Get all users statistics including total count and ratings
+    """
+    
+    total_users = await db.scalar(select(func.count(User.id)))
+    
+    users_with_ratings = await db.scalar(
+        select(func.count(User.id))
+        .where(User.has_rated == True)
+    )
+    
+    return {
+        "total_users": total_users,
+        "users_with_ratings": users_with_ratings,
+        "rating_percentage": round((users_with_ratings / total_users) * 100, 2) if total_users else 0
+    }
