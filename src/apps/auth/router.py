@@ -311,12 +311,16 @@ async def websocket_user_details(websocket: WebSocket, db: AsyncSession = Depend
             )
         )
 
+        print("Total Verses in Caught in websocket", total_verses_caught)
+
         unique_books_caught = await db.scalar(
             select(func.count(distinct(UserActivity.activity_data))).where(
                 UserActivity.user_id == db_user.id,
                 UserActivity.activity_type == "verse_caught"
             )
         )
+        print("Total Unique Verses in Caught in websocket", unique_books_caught)
+
 
         # Check if the user has logged in today
         today = datetime.utcnow().date()
@@ -344,7 +348,7 @@ async def websocket_user_details(websocket: WebSocket, db: AsyncSession = Depend
             "bible_version": db_user.bible_version,
             "created_at": db_user.created_at.isoformat(),
             "logged_in_today": logged_in_today,
-            "total_verses_caught": total_verses_caught,
+            "total_verses_caught": total_verses_caught-1,
             "unique_books_caught": unique_books_caught,
             "has_taken_tour": db_user.has_taken_tour,
             "payment_status": payment_status,
@@ -434,7 +438,7 @@ async def websocket_user_details(websocket: WebSocket, db: AsyncSession = Depend
                     "bible_version": db_user.bible_version,
                     "created_at": db_user.created_at.isoformat(),
                     "logged_in_today": logged_in_today,
-                    "total_verses_caught": total_verses_caught,
+                    "total_verses_caught": total_verses_caught-1,
                     "unique_books_caught": unique_books_caught,
                     "has_taken_tour": db_user.has_taken_tour,
                     "payment_status": payment_status,
