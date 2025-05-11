@@ -6,7 +6,7 @@ from sqlalchemy import text
 from jose import JWTError, jwt
 from datetime import datetime, timedelta, timezone
 from core.database import aget_db
-from apps.requotes.models import User, UserActivity,Achievement, UnverifiedUser, UserTheme, Theme, Payment
+from apps.requotes.models import User, UserActivity,Achievement, UnverifiedUser, UserTheme, Theme, Payment, Rating
 from apps.auth.schemas import UserCreate, LoginRequest, Token, EmailCheckRequest, EmailCheckResponse, SignupResponse
 from apps.auth.utils import get_password_hash, verify_password, create_access_token, create_verification_token, send_verification_email, verify_paystack_signature
 from sqlalchemy import select, func, distinct, delete
@@ -350,6 +350,7 @@ async def websocket_user_details(websocket: WebSocket, db: AsyncSession = Depend
             "unique_books_caught": unique_books_caught,
             "has_taken_tour": db_user.has_taken_tour,
             "payment_status": payment_status,
+            "has_rated": db_user.has_rated,
             "achievements": [
                 {
                     "id": str(achievement.id),
@@ -439,6 +440,7 @@ async def websocket_user_details(websocket: WebSocket, db: AsyncSession = Depend
                     "unique_books_caught": unique_books_caught,
                     "has_taken_tour": db_user.has_taken_tour,
                     "payment_status": payment_status,
+                    "has_rated": db_user.has_rated,
                     "achievements": [
                         {
                             "id": str(achievement.id),
@@ -1049,3 +1051,87 @@ async def payment_webhook(
             await db.commit()
 
     return {"status": "success"}
+
+# Rating Endpoint
+@router.post("/api/submit-rating")
+async def submit_rating(
+    data: dict,
+    db: AsyncSession = Depends(aget_db),
+    token: str = Depends(oauth2_scheme)
+):
+    """
+    Submit a user rating for the app. Feedback is automatically generated based on the rating.
+    
+    Parameters:
+    - rating: int (required, 1-5)
+    
+    Returns:
+    - message: str
+    """
+    try:
+        # Authentication
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        email = payload.get("sub")
+        if not email:
+            raise HTTPException(status_code=401, detail="Invalid token")
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    # Validate input
+    rating = data.get("rating")
+    
+    if rating is None:
+        raise HTTPException(status_code=400, detail="Rating is required")
+    
+    try:
+        rating = int(rating)
+        if rating < 1 or rating > 5:
+            raise ValueError("Rating must be between 1 and 5")
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Rating must be an integer between 1 and 5")
+
+    # Get user
+    result = await db.execute(select(User).where(User.email == email))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # Check if user has already rated
+    if user.has_rated:
+        raise HTTPException(status_code=400, detail="You have already submitted a rating")
+
+    # Define rating descriptions
+    rating_descriptions = {
+        1: "Worse - Needs work",
+        2: "Good - Has potential",
+        3: "Better - Good but could improve",
+        4: "Best - Really enjoying it",
+        5: "Excellent - Perfect experience!"
+    }
+
+    # Get the automatic feedback based on rating
+    feedback = rating_descriptions.get(rating, "")
+
+    try:
+        # Create a new Rating record
+        new_rating = Rating(
+            user_id=user.id,
+            rating=rating,
+            feedback=feedback,
+            created_at=datetime.utcnow()
+        )
+        db.add(new_rating)
+
+        # Update user's rating fields
+        user.rating = rating
+        user.rating_feedback = feedback
+        user.has_rated = True
+        user.rated_at = datetime.utcnow()
+
+        await db.commit()
+
+        return {"message": "Thank you for your rating!"}
+
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail="Failed to submit rating")
