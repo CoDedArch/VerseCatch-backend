@@ -7,18 +7,7 @@ pip install -r requirements.txt
 
 # Initialize database (critical step)
 echo "🛠️ Initializing database..."
-python -c "
-import asyncio
-from src.core.database._db import session_manager
-from src.apps.requotes.models import Base
-
-async def init_db():
-    async with session_manager.engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-        print('✅ Database tables created')
-
-asyncio.run(init_db())
-"
+python -m src.core.database.init_db
 
 # Only run migrations if alembic.ini exists
 if [ -f "alembic.ini" ]; then
