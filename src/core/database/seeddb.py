@@ -57,22 +57,33 @@ async def seed_versions_and_verses(session: AsyncSession):
 
         # Insert verses
         verse_count = 0
+        BATCH_SIZE = 1000
+        verses_to_insert = []
+
         for book_name, chapters in version_data["books"].items():
             for chapter_num, verses in chapters.items():
                 for verse_num, verse_text in verses.items():
-                    verse = Verse(
+                    verses_to_insert.append(Verse(
                         id=uuid4(),
                         version_id=version.id,
                         book=book_name,
                         chapter=int(chapter_num),
                         verse_number=int(verse_num),
                         text=verse_text,
-                    )
-                    session.add(verse)
-                    verse_count += 1
+                    ))
 
-        await session.commit()
-        print(f"📖 Inserted {verse_count} verses for {version_name}")
+                    if len(verses_to_insert) >= BATCH_SIZE:
+                        session.add_all(verses_to_insert)
+                        await session.commit()
+                        verse_count += len(verses_to_insert)
+                        print(f"🔄 Inserted {verse_count} verses so far...")
+                        verses_to_insert = []
+
+        # Insert remaining verses
+        if verses_to_insert:
+            session.add_all(verses_to_insert)
+            await session.commit()
+            verse_count += len(verses_to_insert)
 
     return True
 
