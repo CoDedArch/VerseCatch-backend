@@ -50,7 +50,7 @@ async def send_verification_email(email: str, token: str):
     """
     Send a production-ready verification email using SendGrid
     """
-    verification_url = f"https://6ebf-129-224-201-94.ngrok-free.app/auth/verify?token={token}"
+    verification_url = f"{settings.BASE_URL}/auth/verify?token={token}"
     
     # Professional email template with plain text fallback
     html_content = f"""
