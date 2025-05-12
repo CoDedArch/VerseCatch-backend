@@ -22,3 +22,6 @@ if [ "$SEED_DB" = "true" ]; then
 else
     echo "🔄 Skipping database seeding (SEED_DB not set to 'true')"
 fi
+
+# Start the FastAPI application
+uvicorn src.main:app --host 0.0.0.0 --port $PORT
