@@ -18,7 +18,7 @@ def hash_key(key: str) -> str:
 class Settings(BaseSettings):
     """Class to store all the settings of the application."""
 
-    APOSTGRES_DATABASE_URL: str = os.getenv("APOSTGRES_DATABASE_URL")
+    APOSTGRES_DATABASE_URL: str = Field(env="APOSTGRES_DATABASE_URL")
     API_KEY: str = Field(env="API_KEY")
     OPENAI_API_KEY: str = Field(env="OPENAI_API_KEY")
     SECRET_KEY: str = Field(env="SECRET_KEY")
@@ -28,7 +28,7 @@ class Settings(BaseSettings):
     EMAIL_FROM: str = os.getenv("EMAIL_FROM", "no-reply@versecatch.pro")
     BASE_URL: str = os.getenv("BASE_URL", "https://versecatch.pro")
     PAYSTACK_SECRET_KEY: str = os.getenv("PAYSTACK_SECRET_KEY")
-    DATA_DIR: str = os.getenv("DATA_DIR")
+    DATA_DIR: str = Field(default="../../data",env="DATA_DIR")
     THEMES: ClassVar[List[Dict[str, Any]]] = [
     {
         "name": "default",
