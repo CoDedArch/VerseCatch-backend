@@ -1,12 +1,11 @@
 """
 This module provides an asynchronous database session manager for interacting with a PostgreSQL database using SQLAlchemy.
 """
-
+import codecs
 from asyncio import current_task
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 from uuid import uuid4
-
 from dotenv import load_dotenv
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import (
@@ -16,7 +15,6 @@ from sqlalchemy.ext.asyncio import (
 )
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
-
 from core.config import settings
 
 load_dotenv()
@@ -48,7 +46,7 @@ class DatabaseSessionManager:
         Raises:
             Exception: If the database engine fails to initialize.
         """
-        print(database_url)
+        database_url = codecs.decode(settings.APOSTGRES_DATABASE_URL, 'unicode_escape')
         self.engine = create_async_engine(
             database_url,
             pool_size=20,

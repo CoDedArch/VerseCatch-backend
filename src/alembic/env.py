@@ -10,6 +10,7 @@ sys.path.append(os.getcwd())
 
 # Import your SQLAlchemy Base and models
 from core.database import Base
+from core.config import settings
 from apps.requotes.models import *  # Import all your models
 from apps.requotes.models import *  # Import all your models
 
@@ -24,12 +25,11 @@ if config.config_file_name is not None:
 target_metadata = Base.metadata
 
 # Define the database URL
-DATABASE_URL = "postgresql+asyncpg://postgres:yourpassword@localhost/ai_bible_db"
 
 def run_migrations_offline():
     """Run migrations in 'offline' mode."""
     context.configure(
-        url=DATABASE_URL,
+        url=settings.APOSTGRES_DATABASE_URL,
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
@@ -40,7 +40,7 @@ def run_migrations_offline():
 
 async def run_migrations_online():
     """Run migrations in 'online' mode."""
-    connectable = create_async_engine(DATABASE_URL)
+    connectable = create_async_engine(settings.APOSTGRES_DATABASE_URL)
 
     async with connectable.connect() as connection:
         await connection.run_sync(

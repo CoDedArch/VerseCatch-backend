@@ -1,9 +1,12 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from .core.database import session_manager
+from core.database import session_manager
 from apps.requotes.models import Base
 from apps.requotes.router import router as bible_quotes_router
 from apps.auth.router import router as auth_router
+import sys
+from pathlib import Path
+sys.path.append(str(Path(__file__).parent))
 
 
 app = FastAPI(
@@ -16,10 +19,10 @@ app = FastAPI(
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins (replace with your frontend URL in production)
+    allow_origins=["*"],
     allow_credentials=True,
-    allow_methods=["*"],  # Allow all methods (including OPTIONS)
-    allow_headers=["*"],  # Allow all headers
+    allow_methods=["*"],  
+    allow_headers=["*"],
 )
 
 

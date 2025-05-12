@@ -17,7 +17,7 @@ def hash_key(key: str) -> str:
 class Settings(BaseSettings):
     """Class to store all the settings of the application."""
 
-    APOSTGRES_DATABASE_URL: str = Field(env="APOSTGRES_DATABASE_URL")
+    APOSTGRES_DATABASE_URL: str = os.getenv("APOSTGRES_DATABASE_URL")
     API_KEY: str = Field(env="API_KEY")
     OPENAI_API_KEY: str = Field(env="OPENAI_API_KEY")
     SECRET_KEY: str = Field(env="SECRET_KEY")
