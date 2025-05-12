@@ -114,6 +114,9 @@ async def seed_themes(session: AsyncSession):
 async def main():
     """Main seeding function with error handling."""
     try:
+        print("🛠️ Initializing session manager...")
+        await session_manager.init()
+        print("✅ Session manager initialized")
         async with session_manager.get_session() as session:
             print("\n🚀 Starting database seeding...")
 
@@ -136,6 +139,10 @@ async def main():
     except Exception as e:
         print(f"\n❌ Critical seeding error: {str(e)}")
         raise
+
+    finally:
+        await session_manager.close()
+        print("🛑 Database session closed")
 
 if __name__ == "__main__":
     asyncio.run(main())
