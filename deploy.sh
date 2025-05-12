@@ -18,16 +18,16 @@ fi
 # Seed the database (only if SEED_DB=true)
 if [ "$SEED_DB" = "true" ]; then
     echo "🏗️ Starting database seeding..."
-    python -c "
-    import asyncio
-    from src.core.database.seeddb import main
-    
-    async def run_seeding():
-        await main()
-        print('✅ Seeding completed')
-    
-    asyncio.run(run_seeding())
-    "
+    python <<EOF
+import asyncio
+from src.core.database.seeddb import main
+
+async def run_seeding():
+    await main()
+    print('✅ Seeding completed')
+
+asyncio.run(run_seeding())
+EOF
 else
     echo "🔄 Skipping database seeding (SEED_DB not set to 'true')"
 fi
