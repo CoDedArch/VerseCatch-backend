@@ -215,6 +215,7 @@ async def login(user: LoginRequest, db: AsyncSession = Depends(aget_db)):
 
 @router.post("/auth/check-email", response_model=EmailCheckResponse)
 async def check_email(request: EmailCheckRequest, db: AsyncSession = Depends(aget_db)):
+    print("request recieved")
     """
     Check if an email already exists in the database.
     """
@@ -348,7 +349,7 @@ async def websocket_user_details(websocket: WebSocket, db: AsyncSession = Depend
             "bible_version": db_user.bible_version,
             "created_at": db_user.created_at.isoformat(),
             "logged_in_today": logged_in_today,
-            "total_verses_caught": total_verses_caught-1,
+            "total_verses_caught": total_verses_caught,
             "unique_books_caught": unique_books_caught,
             "has_taken_tour": db_user.has_taken_tour,
             "payment_status": payment_status,
@@ -438,7 +439,7 @@ async def websocket_user_details(websocket: WebSocket, db: AsyncSession = Depend
                     "bible_version": db_user.bible_version,
                     "created_at": db_user.created_at.isoformat(),
                     "logged_in_today": logged_in_today,
-                    "total_verses_caught": total_verses_caught-1,
+                    "total_verses_caught": total_verses_caught,
                     "unique_books_caught": unique_books_caught,
                     "has_taken_tour": db_user.has_taken_tour,
                     "payment_status": payment_status,
