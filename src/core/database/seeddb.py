@@ -9,7 +9,7 @@ from sqlalchemy.future import select
 # Add project root to path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from apps.requotes.models import Verse, Version, Theme
-from _db import session_manager
+from core.database._db import session_manager
 from core.config import settings
 
 DATA_DIR = os.path.join(os.path.dirname(__file__), settings.DATA_DIR)
