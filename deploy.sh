@@ -1,11 +1,9 @@
 #!/bin/bash
 # deploy.sh
-set -e  # Exit immediately if any command fails
+set -e
 
-# Install dependencies
 pip install -r requirements.txt
 
-# Initialize database (critical step)
 echo "🛠️ Initializing database..."
 python -m src.core.database.init_db
 
@@ -25,5 +23,4 @@ else
     echo "🔄 Skipping database seeding (SEED_DB not set to 'true')"
 fi
 
-# Start the FastAPI application
 uvicorn src.main:app --host 0.0.0.0 --port $PORT
