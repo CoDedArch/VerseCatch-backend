@@ -18,10 +18,22 @@ fi
 # Seed the database (only if SEED_DB=true)
 if [ "$SEED_DB" = "true" ]; then
     echo "🏗️ Starting database seeding..."
-    python -m src.core.database.seeddb
+    python -c "
+    import asyncio
+    from src.core.database.seeddb import main
+    
+    async def run_seeding():
+        await main()
+        print('✅ Seeding completed')
+    
+    asyncio.run(run_seeding())
+    "
 else
     echo "🔄 Skipping database seeding (SEED_DB not set to 'true')"
 fi
 
-# Start the FastAPI application
-uvicorn src.main:app --host 0.0.0.0 --port $PORT
+# Keep worker alive if needed (remove if one-time task)
+while true; do
+    sleep 3600  # Sleep for 1 hour
+    echo "🔄 Background worker keep-alive"
+done
