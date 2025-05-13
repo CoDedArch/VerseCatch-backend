@@ -93,3 +93,6 @@ class SignupResponse(BaseModel):
 class LoginRequest(BaseModel):
     identifier: str = Field(..., title="Identifier (email or username)")
     password: SecretStr
+
+class DeleteAccountRequest(BaseModel):
+    email: str

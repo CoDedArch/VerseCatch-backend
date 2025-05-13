@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(env="ACCESS_TOKEN_EXPIRE", default=30)
     SENDGRID_API_KEY: str = os.getenv("SENDGRID_API_KEY")
     EMAIL_FROM: str = os.getenv("EMAIL_FROM", "no-reply@versecatch.pro")
-    BASE_URL: str = os.getenv("BASE_URL", "https://versecatch.pro")
+    BASE_URL: str = os.getenv("BASE_URL")
     PAYSTACK_SECRET_KEY: str = os.getenv("PAYSTACK_SECRET_KEY")
     DATA_DIR: str = Field(default="../../data",env="DATA_DIR")
     THEMES: ClassVar[List[Dict[str, Any]]] = [

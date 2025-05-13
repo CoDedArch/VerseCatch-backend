@@ -15,7 +15,7 @@ from fastapi import WebSocket, WebSocketDisconnect
 from sqlalchemy import select, func, distinct, delete
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from apps.requotes.models import User, UserActivity,Achievement, UnverifiedUser, UserTheme, Theme, Payment, Rating
-from apps.auth.schemas import UserCreate, LoginRequest, Token, EmailCheckRequest, EmailCheckResponse, SignupResponse
+from apps.auth.schemas import UserCreate, LoginRequest, Token, EmailCheckRequest, EmailCheckResponse, SignupResponse, DeleteAccountRequest
 from apps.auth.utils import get_password_hash, verify_password, create_access_token, create_verification_token, send_verification_email, verify_paystack_signature
 
 router = APIRouter()
@@ -212,6 +212,66 @@ async def login(user: LoginRequest, db: AsyncSession = Depends(aget_db)):
         "token_type": "bearer",
     }
 
+
+@router.delete("/auth/delete-account")
+async def delete_account(
+    request: DeleteAccountRequest,
+    db: AsyncSession = Depends(aget_db)
+):
+    """
+    Permanently delete user account and all associated data using email.
+    """
+    try:
+        # First get the user by email
+        result = await db.execute(select(User).where(User.email == request.email))
+        user = result.scalar_one_or_none()
+        
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found"
+            )
+
+        # Ensure any existing transaction is committed/rolled back
+        if db.in_transaction():
+            await db.commit()
+
+        # Start a new transaction
+        async with db.begin():
+            # Delete all user activities
+            await db.execute(delete(UserActivity).where(UserActivity.user_id == user.id))
+            
+            # Delete all achievements
+            await db.execute(delete(Achievement).where(Achievement.user_id == user.id))
+            
+            # Delete all user themes
+            await db.execute(delete(UserTheme).where(UserTheme.user_id == user.id))
+            
+            # Delete all payments
+            await db.execute(delete(Payment).where(Payment.user_id == user.id))
+            
+            # Delete all ratings
+            await db.execute(delete(Rating).where(Rating.user_id == user.id))
+            
+            # Delete the user
+            await db.execute(delete(User).where(User.id == user.id))
+            
+            # Check if user exists in unverified_users (just in case)
+            await db.execute(delete(UnverifiedUser).where(UnverifiedUser.email == request.email))
+            
+        return {"message": "Account and all associated data deleted successfully"}
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        if db.in_transaction():
+            await db.rollback()
+        print(f"Failed to delete account for email {request.email}: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to delete account. Please try again later."
+        )
+    
 
 @router.post("/auth/check-email", response_model=EmailCheckResponse)
 async def check_email(request: EmailCheckRequest, db: AsyncSession = Depends(aget_db)):
