@@ -192,7 +192,7 @@ async def login(user: LoginRequest, db: AsyncSession = Depends(aget_db)):
             else:
                 db_user.streak = 1
         else:
-            db_user.streak = 0
+            db_user.streak = 1
 
         db_user.last_login = datetime.utcnow()
 

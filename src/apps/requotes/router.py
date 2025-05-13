@@ -1,5 +1,5 @@
 import asyncio
-from sqlalchemy import select
+from sqlalchemy import select, update
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, status, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import datetime, timedelta
@@ -53,7 +53,12 @@ async def track_verse_catch(session, user, book_name):
         print(f"Total verses caught: {total_verses}")
         
         # Increase faith_coins by 2
-        user.faith_coins = total_verses * 2 
+        await session.execute(
+            update(User)
+            .where(User.id == user.id)
+            .values(faith_coins=User.faith_coins + 2)
+        )
+        await session.refresh(user)
         print(f"Updated faith_coins to {user.faith_coins}")
 
         # Award "Verse Catcher" after 100 verses
