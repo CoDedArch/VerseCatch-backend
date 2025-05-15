@@ -12,13 +12,16 @@ from . constants import inspirational_verses
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi.security import OAuth2PasswordBearer
 from fastapi import WebSocket, WebSocketDisconnect
+from fastapi.responses import RedirectResponse, HTMLResponse
 from sqlalchemy import select, func, distinct, delete
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from apps.requotes.models import User, UserActivity,Achievement, UnverifiedUser, UserTheme, Theme, Payment, Rating
 from apps.auth.schemas import UserCreate, LoginRequest, Token, EmailCheckRequest, EmailCheckResponse, SignupResponse, DeleteAccountRequest
 from apps.auth.utils import get_password_hash, verify_password, create_access_token, create_verification_token, send_verification_email, verify_paystack_signature
+from starlette.templating import Jinja2Templates
 
 router = APIRouter()
+templates = Jinja2Templates(directory="templates")
 
 # OAuth2 scheme for token authentication
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
@@ -113,45 +116,60 @@ async def signup(user: UserCreate, db: AsyncSession = Depends(aget_db)):
     return {"message": "Verification email sent. Please check your inbox."}
 
 
-#verify route
 @router.get("/auth/verify")
 async def verify_email(token: str, db: AsyncSession = Depends(aget_db)):
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Invalid verification token",
-    )
+    credentials_redirect = RedirectResponse(url="/verify-failed", status_code=302)
+
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         email: str = payload.get("sub")
         if email is None:
-            raise credentials_exception
+            return credentials_redirect
     except JWTError:
-        raise credentials_exception
+        return credentials_redirect
 
-    result = await db.execute(select(UnverifiedUser).where(UnverifiedUser.email == email))
-    unverified_user = result.scalar_one_or_none()
-    if unverified_user is None:
-        raise credentials_exception
+    try:
+        result = await db.execute(select(UnverifiedUser).where(UnverifiedUser.email == email))
+        unverified_user = result.scalar_one_or_none()
+        if unverified_user is None:
+            # Check if already verified (helpful for clicking link again)
+            result = await db.execute(select(User).where(User.email == email))
+            existing_user = result.scalar_one_or_none()
+            if existing_user:
+                return RedirectResponse(url="/verify-success", status_code=302)
+            return credentials_redirect
 
-    new_user = User(
-        user_name=unverified_user.user_name,
-        email=unverified_user.email,
-        password=unverified_user.password,
-        verified=True,
-        streak=0,
-        faith_coins=0,
-        current_tag="Newbie",
-        bible_version=unverified_user.bible_version,
-    )
+        new_user = User(
+            user_name=unverified_user.user_name,
+            email=unverified_user.email,
+            password=unverified_user.password,
+            verified=True,
+            streak=0,
+            faith_coins=0,
+            current_tag="Newbie",
+            bible_version=unverified_user.bible_version,
+        )
 
-    db.add(new_user)
+        db.add(new_user)
+        await db.delete(unverified_user)
+        await db.commit()
 
-    await db.delete(unverified_user)
+        return RedirectResponse(url="/verify-success", status_code=302)
 
-    await db.commit()
+    except Exception as e:
+        # Optional: log error if you use logging
+        print(f"Server error during verification: {str(e)}")
+        return credentials_redirect
 
-    return {"message": "Email verified successfully"}
 
+@router.get("/verify-success", response_class=HTMLResponse)
+async def verify_success(request: Request):
+    return templates.TemplateResponse("verify_success.html", {"request": request})
+
+
+@router.get("/verify-failed", response_class=HTMLResponse)
+async def verify_failed(request: Request):
+    return templates.TemplateResponse("verify_failed.html", {"request": request})
 
 # login endpoint
 @router.post("/auth/login", response_model=Token)
