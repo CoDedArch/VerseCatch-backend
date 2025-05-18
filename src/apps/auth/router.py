@@ -15,7 +15,7 @@ from fastapi import WebSocket, WebSocketDisconnect
 from fastapi.responses import RedirectResponse, HTMLResponse
 from sqlalchemy import select, func, distinct, delete
 from fastapi import APIRouter, Depends, HTTPException, status, Request
-from apps.requotes.models import User, UserActivity,Achievement, UnverifiedUser, UserTheme, Theme, Payment, Rating
+from apps.requotes.models import User, UserActivity,Achievement, UnverifiedUser, UserTheme, Theme, Payment, Rating, VerseCapture
 from apps.auth.schemas import UserCreate, LoginRequest, Token, EmailCheckRequest, EmailCheckResponse, SignupResponse, DeleteAccountRequest
 from apps.auth.utils import get_password_hash, verify_password, create_access_token, create_verification_token, send_verification_email, verify_paystack_signature
 from starlette.templating import Jinja2Templates
@@ -1249,18 +1249,28 @@ async def get_user_stats(
     token: str = Depends(oauth2_scheme)
 ):
     """
-    Get all users statistics including total count and ratings
+    Get all users statistics including total count, ratings, verse captures and supporters
     """
-    
+    # User statistics
     total_users = await db.scalar(select(func.count(User.id)))
-    
     users_with_ratings = await db.scalar(
         select(func.count(User.id))
         .where(User.has_rated == True)
+    )
+    supporters_count = await db.scalar(
+        select(func.count(User.id))
+        .where(User.is_supporter == True)
+    )
+    
+    # Verse capture statistics
+    total_verses_caught = await db.scalar(
+        select(func.coalesce(func.sum(VerseCapture.count), 0))
     )
     
     return {
         "total_users": total_users,
         "users_with_ratings": users_with_ratings,
-        "rating_percentage": round((users_with_ratings / total_users) * 100, 2) if total_users else 0
+        "supporters_count": supporters_count,
+        "rating_percentage": round((users_with_ratings / total_users) * 100, 2) if total_users else 0,
+        "total_verses_caught": total_verses_caught
     }

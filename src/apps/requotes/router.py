@@ -1,5 +1,5 @@
 import asyncio
-from sqlalchemy import select, update
+from sqlalchemy import select, update, text
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, status, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import datetime, timedelta
@@ -10,6 +10,10 @@ from core.security import verify_api_key
 from apps.requotes.services import QuoteDetectionService
 from apps.requotes.models import Verse, Version
 import logging
+from uuid import uuid4, UUID as PyUUID
+from typing import Optional
+
+
 
 
 router = APIRouter()
@@ -121,53 +125,101 @@ async def executeTrackVerseCatch(data: dict, session: AsyncSession = Depends(age
         raise HTTPException(status_code=500, detail="Internal server error")
     
 
-async def process_audio_queue(websocket: WebSocket, session: AsyncSession, queue: asyncio.Queue, version):
+async def increment_capture_count(
+    session: AsyncSession,
+    user_id: Optional[PyUUID] = None,
+    anonymous_id: Optional[str] = None
+) -> int:
     """
-    Background task to process audio chunks from a queue, detect quotes in the audio,
-    and send the detected quotes via a WebSocket.
-
-    This function is an asynchronous task that continuously retrieves audio chunks 
-    from the provided queue. For each chunk, it uses the QuoteDetectionService to 
-    scan for quotes. If any quotes are detected, they are serialized and sent 
-    through the provided WebSocket connection.
-
-    Args:
-        websocket (WebSocket): The WebSocket connection used to send detected quotes.
-        session (AsyncSession): The database session used for querying or interacting 
-                                with the database during quote detection.
-        queue (asyncio.Queue): An asyncio queue that holds audio chunks to be processed. 
-                               The queue should contain audio chunks that are asynchronously 
-                               processed one at a time.
-
-    Returns:
-        None
-
-    Raises:
-        Any exceptions raised by QuoteDetectionService or WebSocket send operation
-        are propagated, and the task will stop processing further chunks if an error occurs.
-
-    Notes:
-        - The function runs indefinitely until a `None` value is retrieved from the queue, 
-          which signals the task to stop processing.
-        - The `quote_detected` attribute of the detector indicates if any quotes were found 
-          in the audio chunk.
-        - The `model_dump()` method serializes the detected quotes for sending via WebSocket.
+    Atomically increments the capture count for a user (logged-in or anonymous).
+    Returns the new total count.
     """
+    if not user_id and not anonymous_id:
+        raise ValueError("Either user_id or anonymous_id must be provided")
+
+    # Upsert logic (PostgreSQL syntax)
+    result = await session.execute(text("""
+        INSERT INTO verse_captures (user_id, anonymous_id, count)
+        VALUES (:user_id, :anonymous_id, 1)
+        ON CONFLICT (COALESCE(user_id, anonymous_id))  -- Ensures uniqueness
+        DO UPDATE SET 
+            count = verse_captures.count + 1,
+            last_captured_at = NOW()
+        RETURNING count
+    """), {"user_id": user_id, "anonymous_id": anonymous_id})
+
+    await session.commit()
+    return result.scalar()
+
+
+async def process_audio_queue(
+    websocket: WebSocket,
+    session: AsyncSession,
+    queue: asyncio.Queue,
+    version: str
+):
     while True:
         audio_chunk = await queue.get()
         if audio_chunk is None:
             break
 
         try:
+            # Initialize detector (don't share session)
             detector = QuoteDetectionService(session, audio_chunk, version=version)
             await detector.scan_for_quotes()
+            
             if detector.quote_detected:
+                print("QUOTE DETECTED")
+                user_id = None
+                anonymous_id = None
+
+                if websocket.user_email:
+                    print("User Is Logged In")
+                    result = await session.execute(
+                        select(User.id).where(User.email == websocket.user_email)
+                    )
+                    user_id = result.scalar()
+                    
+                    if user_id is None:
+                        print("User not found, falling back to anonymous")
+                        anonymous_id = str(uuid4())
+                else:
+                    anonymous_id = str(uuid4())
+                    print("USER IS Anonymous")
+
+                # Unified tracking
+                tracking_id = user_id if user_id is not None else anonymous_id
+                id_type = "user_id" if user_id is not None else "anonymous_id"
+                
+                if tracking_id:
+                    print(f"Attempting DB update as {id_type}...")
+                    try:
+                        # Use execute + commit instead of transaction block
+                        await session.execute(
+                            text(f"""
+                            INSERT INTO verse_captures ({id_type}, count)
+                            VALUES (:tracking_id, 1)
+                            ON CONFLICT ({id_type})
+                            DO UPDATE SET 
+                                count = verse_captures.count + 1,
+                                last_captured_at = NOW()
+                            """),
+                            {"tracking_id": tracking_id}
+                        )
+                        await session.commit()
+                        print("DONE UPDATING VERSECAPTURES")
+                    except Exception as e:
+                        print(f"DB update failed: {str(e)}")
+                        await session.rollback()
+                        raise
+                
                 await websocket.send_json([q.model_dump() for q in detector.quotes])
+                
         except Exception as e:
             print(f"Error processing audio chunk: {e}")
+            await websocket.send_json({"error": str(e)})
         finally:
             queue.task_done()
-
 
 @router.websocket("/ws/detect-quotes")
 async def websocket_endpoint(

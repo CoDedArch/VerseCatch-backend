@@ -1,16 +1,17 @@
 from datetime import datetime
 from typing import List
 from uuid import uuid4, UUID as PyUUID
-from sqlalchemy import ForeignKey, String, Integer, text, Column, Boolean, DateTime, CheckConstraint, Numeric, Text
+from sqlalchemy import ForeignKey, String, Integer, text, Column, Boolean, DateTime, CheckConstraint, Numeric, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from typing import Optional
 from sqlalchemy.sql import func
 from core.database import Base
-from sqlalchemy import JSON
+from sqlalchemy import JSON, Index
 from sqlalchemy.types import TypeDecorator, VARCHAR
 from sqlalchemy.ext.hybrid import hybrid_property
 import json
+from sqlalchemy.sql import expression
 
 class JSONEncodedDict(TypeDecorator):
     """Represents a JSON-encoded dictionary."""
@@ -27,8 +28,29 @@ class JSONEncodedDict(TypeDecorator):
             value = json.loads(value)
         return value
 
+class VerseCapture(Base):
+    __tablename__ = "verse_captures"
 
+    id: Mapped[PyUUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, server_default=func.uuid_generate_v4()
+    )
+    user_id: Mapped[Optional[PyUUID]] = mapped_column(
+        UUID(as_uuid=True), unique=True, nullable=True
+    )
+    anonymous_id: Mapped[Optional[str]] = mapped_column(
+        String(36), unique=True, nullable=True
+    )
+    count: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    last_captured_at: Mapped[DateTime] = mapped_column(DateTime, server_default=func.now())
 
+    __table_args__ = (
+        CheckConstraint(
+            "(user_id IS NOT NULL) OR (anonymous_id IS NOT NULL)",
+            name="ck_verse_captures_has_id"
+        ),
+    )
+
+    
 class Version(Base):
     __tablename__ = "bible_versions"
 
