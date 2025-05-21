@@ -92,17 +92,18 @@ async def signup(user: UserCreate, db: AsyncSession = Depends(aget_db)):
     """
     Register a new user and store them temporarily until email verification.
     """
-    result = await db.execute(select(User).where(User.email == user.email))
+    useremail = user.email.lower()
+    result = await db.execute(select(User).where(User.email == useremail))
     if result.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="Email already registered")
 
     hashed_password = get_password_hash(user.password.get_secret_value())
     
-    verification_token = create_verification_token({"sub": user.email})
+    verification_token = create_verification_token({"sub": useremail})
 
     new_unverified_user = UnverifiedUser(
         user_name=user.user_name,
-        email=user.email,
+        email=useremail,
         password=hashed_password,
         bible_version=user.bible_version,
         verification_token=verification_token,
@@ -111,7 +112,7 @@ async def signup(user: UserCreate, db: AsyncSession = Depends(aget_db)):
     db.add(new_unverified_user)
     await db.commit()
 
-    await send_verification_email(user.email, verification_token)
+    await send_verification_email(useremail, verification_token)
 
     return {"message": "Verification email sent. Please check your inbox."}
 
@@ -178,9 +179,13 @@ async def login(user: LoginRequest, db: AsyncSession = Depends(aget_db)):
     Log in a user using either email or username and return a JWT token.
     """
     print("user requested:",user)
+
     # Find user by email or username
+    user_identifier = user.identifier
+    if "@" in user_identifier and "." in user_identifier:
+        user_identifier = user_identifier.lower()
     result = await db.execute(
-        select(User).where((User.email == user.identifier) | (User.user_name == user.identifier))
+        select(User).where((User.email == user_identifier) | (User.user_name == user_identifier))
     )
     db_user = result.scalar_one_or_none()
 
@@ -297,8 +302,9 @@ async def check_email(request: EmailCheckRequest, db: AsyncSession = Depends(age
     """
     Check if an email already exists in the database.
     """
+    email = request.email.lower()
     # Query the database to check if the email exists
-    result = await db.execute(select(User).where(User.email == request.email))
+    result = await db.execute(select(User).where(User.email == email))
     db_user = result.scalar_one_or_none()
 
     # Return whether the email exists
